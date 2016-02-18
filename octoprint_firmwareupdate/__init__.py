@@ -114,7 +114,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                     pass
                 f = open("/home/pi/Marlin/.build_log", "w")
                 self._logger.info("Firmware update request has been made. Running...")
-                pro = Popen("cd /home/pi/Marlin; git fetch; git reset --hard origin/master; ./build.sh", stdout=f, stderr=f, shell=True, preexec_fn=os.setsid)
+                pro = Popen("cd /home/pi/Marlin; git fetch; git reset --hard origin/v8_GEN3C; ./build.sh", stdout=f, stderr=f, shell=True, preexec_fn=os.setsid)
                 self.updatePID = pro.pid
                 self.isUpdating = True
                 self._logger.info("Setting isUpdating to " + str(self.isUpdating))
