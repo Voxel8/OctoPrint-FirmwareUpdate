@@ -25,11 +25,17 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         self.isUpdating = False
         self._checkTimer = None
         self.updatePID = None
+        self.f = None
 
     def get_assets(self):
         return {
             "js": ["js/firmwareupdate.js"]
         }
+
+    def close_file(self):
+        if self.f is not None:
+            if not self.f.closed:
+                self.f.close()
 
     def startTimer(self, interval):
         self._checkTimer = RepeatedTimer(interval, self.checkStatus, run_first=True, condition=self.checkStatus)
@@ -41,16 +47,19 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     	    self._logger.info("Failed update...")
             self.isUpdating = False
     	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="A connected device was not found."))
+            self.close_file()
     	    return False
     	elif 'FAILED' in update_result:
     	    self._logger.info("Failed update...")
             self.isUpdating = False
     	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed"))
+            self.close_file()
     	    return False
     	elif 'bytes of flash verified' in update_result and 'successfully' in update_result :
             self._logger.info("Successful update!")
     	    self.isUpdating = False
     	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed"))
+            self.close_file()
     	    return False
     	elif 'ReceiveMessage(): timeout' in update_result:
     	    self._logger.info("Update timed out. Check if port is already in use!")
@@ -60,6 +69,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     	    for child in p.children(recursive=True):
         	    child.kill()
     	    p.kill()
+            self.close_file()
     	    return False
     	elif 'error:' in update_result:
     	    error_list = []
@@ -71,11 +81,13 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     	    self._logger.info("Update failed. Compiling error.")
     	    self.isUpdating = False
     	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason=compileError))
+            self.close_file()
     	    return False
     	elif 'Make failed' in update_result:
     	    self._logger.info("Update failed. Compiling error.")
     	    self.isUpdating = False
     	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Build failed."))
+            self.close_file()
     	    return False
     	else:
     	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="continue"))
@@ -112,14 +124,14 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                     os.remove('/home/pi/Marlin/.build_log')
                 except OSError:
                     pass
-                f = open("/home/pi/Marlin/.build_log", "w")
-                self._logger.info("Firmware update request has been made. Running...")
-                pro = Popen("cd /home/pi/Marlin; git fetch; git reset --hard origin/master; ./build.sh", stdout=f, stderr=f, shell=True, preexec_fn=os.setsid)
-                self.updatePID = pro.pid
-                self.isUpdating = True
-                self._logger.info("Setting isUpdating to " + str(self.isUpdating))
-                self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, createPopup="yes"))
-                self.startTimer(1.0)
+                with open("/home/pi/Marlin/.build_log", "w") as self.f:
+                    self._logger.info("Firmware update request has been made. Running...")
+                    pro = Popen("cd /home/pi/Marlin; git fetch; git reset --hard origin/master; ./build.sh", stdout=f, stderr=f, shell=True, preexec_fn=os.setsid)
+                    self.updatePID = pro.pid
+                    self.isUpdating = True
+                    self._logger.info("Setting isUpdating to " + str(self.isUpdating))
+                    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, createPopup="yes"))
+                    self.startTimer(1.0)
 
     	elif command == "check_is_updating":
     	    if self.isUpdating == True:
