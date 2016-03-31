@@ -14,6 +14,9 @@ import signal
 import linecache
 import psutil
 import time
+import requests
+import json
+import urllib
 
 class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                        octoprint.plugin.TemplatePlugin,
@@ -102,25 +105,15 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
     def on_api_command(self, command, data):
     	if command == "update_firmware":
-            if not os.path.isdir("/home/pi/Marlin/"):
-                self._logger.info("Firmware repository does not exist. Update cancelled.")
-                self.isUpdating = False
-                self._logger.info("Setting isUpdating to " + str(self.isUpdating))
-                self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Firmware repository does not exist. Please clone before running update function."))
+            r = requests.get('https://api.github.com/repos/Voxel8/Marlin/releases/latest')
+            rjson = r.json()
+            firmware_file = os.path.join(os.path.expanduser('~'), 'Marlin/firmware.hex')
+            urllib.urlretrieve(rjson['assets'][0]['browser_download_url'], firmware_file)
+            if os.path.isfile(firmware_file):
+                # File exists, continue updating
             else:
-                try:
-                    os.remove('/home/pi/Marlin/.build_log')
-                except OSError:
-                    pass
-                f = open("/home/pi/Marlin/.build_log", "w")
-                self._logger.info("Firmware update request has been made. Running...")
-                pro = Popen("cd /home/pi/Marlin; git fetch; git reset --hard origin/master; ./build.sh", stdout=f, stderr=f, shell=True, preexec_fn=os.setsid)
-                self.updatePID = pro.pid
-                self.isUpdating = True
-                self._logger.info("Setting isUpdating to " + str(self.isUpdating))
-                self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, createPopup="yes"))
-                self.startTimer(1.0)
-
+                self._logger.info("Failed update... Release firmware was not downloaded")
+                
     	elif command == "check_is_updating":
     	    if self.isUpdating == True:
     	        self._logger.info("Setting isUpdating to " + str(self.isUpdating))
