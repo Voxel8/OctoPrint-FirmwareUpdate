@@ -124,14 +124,14 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                     os.remove('/home/pi/Marlin/.build_log')
                 except OSError:
                     pass
-                with open("/home/pi/Marlin/.build_log", "w") as self.f:
-                    self._logger.info("Firmware update request has been made. Running...")
-                    pro = Popen("cd /home/pi/Marlin; git fetch; git reset --hard origin/master; ./build.sh", stdout=f, stderr=f, shell=True, preexec_fn=os.setsid)
-                    self.updatePID = pro.pid
-                    self.isUpdating = True
-                    self._logger.info("Setting isUpdating to " + str(self.isUpdating))
-                    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, createPopup="yes"))
-                    self.startTimer(1.0)
+                self.f = open("/home/pi/Marlin/.build_log", "w")
+                self._logger.info("Firmware update request has been made. Running...")
+                pro = Popen("cd /home/pi/Marlin; git fetch; git reset --hard origin/master; ./build.sh", stdout=f, stderr=f, shell=True, preexec_fn=os.setsid)
+                self.updatePID = pro.pid
+                self.isUpdating = True
+                self._logger.info("Setting isUpdating to " + str(self.isUpdating))
+                self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, createPopup="yes"))
+                self.startTimer(1.0)
 
     	elif command == "check_is_updating":
     	    if self.isUpdating == True:
