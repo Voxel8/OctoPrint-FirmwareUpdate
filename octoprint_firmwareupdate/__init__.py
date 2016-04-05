@@ -9,7 +9,7 @@ import octoprint.plugin
 from octoprint.util import RepeatedTimer
 import flask
 import os
-from subprocess import Popen, call
+from subprocess import Popen, PIPE
 import signal
 import linecache
 import psutil
@@ -17,6 +17,7 @@ import time
 import requests
 import json
 import urllib
+from threading import Thread
 
 class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                        octoprint.plugin.TemplatePlugin,
@@ -33,56 +34,6 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         return {
             "js": ["js/firmwareupdate.js"]
         }
-
-    def startTimer(self, interval):
-        self._checkTimer = RepeatedTimer(interval, self.checkStatus, run_first=True, condition=self.checkStatus)
-        self._checkTimer.start()
-
-    def checkStatus(self):
-        update_result = open('/home/pi/Marlin/.build_log').read()
-        if 'No device matching following was found' in update_result:
-    	    self._logger.info("Failed update...")
-            self.isUpdating = False
-    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="A connected device was not found."))
-    	    return False
-    	elif 'FAILED' in update_result:
-    	    self._logger.info("Failed update...")
-            self.isUpdating = False
-    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed"))
-    	    return False
-    	elif 'bytes of flash verified' in update_result and 'successfully' in update_result :
-            self._logger.info("Successful update!")
-    	    self.isUpdating = False
-    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed"))
-    	    return False
-    	elif 'ReceiveMessage(): timeout' in update_result:
-    	    self._logger.info("Update timed out. Check if port is already in use!")
-    	    self.isUpdating = False
-    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Device timed out. Please check that the port is not in use!"))
-    	    p = psutil.Process(self.updatePID)
-    	    for child in p.children(recursive=True):
-        	    child.kill()
-    	    p.kill()
-    	    return False
-    	elif 'error:' in update_result:
-    	    error_list = []
-            with open('/home/pi/Marlin/.build_log') as myFile:
-    		for num, line in enumerate(myFile, 1):
-    		    if 'error:' in line:
-    			    error_list.append(line)
-    	    compileError = '<pre>' + ''.join(error_list) + '</pre>'
-    	    self._logger.info("Update failed. Compiling error.")
-    	    self.isUpdating = False
-    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason=compileError))
-    	    return False
-    	elif 'Make failed' in update_result:
-    	    self._logger.info("Update failed. Compiling error.")
-    	    self.isUpdating = False
-    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Build failed."))
-    	    return False
-    	else:
-    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="continue"))
-    	    return True
 
     def get_update_information(self):
         return dict(
@@ -105,15 +56,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
     def on_api_command(self, command, data):
     	if command == "update_firmware":
-            r = requests.get('https://api.github.com/repos/Voxel8/Marlin/releases/latest')
-            rjson = r.json()
-            firmware_file = os.path.join(os.path.expanduser('~'), 'Marlin/firmware.hex')
-            urllib.urlretrieve(rjson['assets'][0]['browser_download_url'], firmware_file)
-            if os.path.isfile(firmware_file):
-                # File exists, continue updating
-            else:
-                self._logger.info("Failed update... Release firmware was not downloaded")
-                
+            self._update_firmware_init_thread = Thread(target=self._update_firmware_init)
+            self._update_firmware_init_thread.daemon = True
+            self._update_firmware_init_thread.start()
+
     	elif command == "check_is_updating":
     	    if self.isUpdating == True:
     	        self._logger.info("Setting isUpdating to " + str(self.isUpdating))
@@ -126,6 +72,48 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
     def on_api_get(self, request):
         return flask.make_response("Not found", 404)
+
+    def _update_firmware_init(self):
+        marlin_dir = os.path.join(os.path.expanduser('~'), 'Marlin/.build/')
+        filenames = os.listdir(marlin_dir)
+        if len(filenames) > 0:
+            if filenames[0].endswith('.hex'):
+                file_exists = True
+            else:
+                file_exists = False
+        if file_exists:
+            self.isUpdating = True
+            self._logger.info("Updating using " + filenames[0])
+            self._update_firmware("local")
+        else:
+            self._logger.info("No files exist, grabbing latest from GitHub")
+            r = requests.get('https://api.github.com/repos/Voxel8/Marlin/releases/latest')
+            rjson = r.json()
+            firmware_file = os.path.join(os.path.expanduser('~'), 'Marlin/.build/firmware.hex')
+            urllib.urlretrieve(rjson['assets'][0]['browser_download_url'], firmware_file)
+            if os.path.isfile(firmware_file):
+                self.isUpdating = True
+                self._logger.info("File downloaded, continuing...")
+                self._update_firmware("github")
+            else:
+                self.isUpdating = False
+                self._logger.info("Failed update... Release firmware was not downloaded")
+
+    def _update_firmware(self, target):
+        if not self.isUpdating:
+            # TODO: Update this error message to be more helpful
+            self._logger.info("Something doesn't make sense here...")
+        else:
+            self._update_firmware_thread = Thread(target=self._update_worker)
+            self._update_firmware_thread.daemon = True
+            self._update_firmware_thread.start()
+
+    def _update_worker(self):
+        self._logger.info("Updating now...")
+        pipe = Popen("cd ~/Marlin/; ino upload -m mega2560", shell=True, stdout=PIPE, stderr=PIPE)
+        results = pipe.communicate()
+        self._logger.info(results[0])
+        self._logger.info(results[1])
 
     def get_template_configs(self):
         return [
