@@ -39,11 +39,11 @@ $(function() {
     };
 
     self.onDataUpdaterReconnect = function() {
-      checkUpdating();
+      self.checkUpdating();
     }
 
-    self.onUserLoggedIn = function(user) {
-      checkUpdating();
+    self.onStartupComplete = function() {
+      self.checkUpdating();
     }
 
     self.onDataUpdaterPluginMessage = function(plugin, data) {
@@ -118,31 +118,36 @@ $(function() {
           command: 'update_firmware'
         }),
         contentType: "application/json; charset=utf-8",
+        dataType: "json"
+      });
+    };
+
+    self.checkUpdating = function() {
+      $.ajax({
+        type: "GET",
+        url: "/api/plugin/firmwareupdate",
+        contentType: "application/json; charset=utf-8",
         dataType: "json",
-        complete: function(data) {
-          console.log(data);
-        },
         error: function(jqXHR, exception) {
-          console.log(jqXHR);
+          console.log('error');
+        },
+        success: function(data) {
+          if (data.status) {
+            $("#printer_connect").prop("disabled", true);
+            self._showPopup({
+              title: gettext("Updating..."),
+              text: gettext("Now updating, please wait."),
+              icon: "icon-cog icon-spin",
+              hide: false,
+              buttons: {
+                closer: false,
+                sticker: false
+              }
+            });
+          }
         }
       });
     };
-  }
-
-  function checkUpdating() {
-    console.log("Checking update status");
-    $.ajax({
-      type: "POST",
-      url: "/api/plugin/firmwareupdate",
-      data: JSON.stringify({
-        command: 'check_is_updating'
-      }),
-      contentType: "application/json; charset=utf-8",
-      dataType: "json",
-      error: function(jqXHR, exception) {
-        console.log(jqXHR);
-      }
-    });
   }
 
   ADDITIONAL_VIEWMODELS.push([
