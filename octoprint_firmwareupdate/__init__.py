@@ -18,6 +18,7 @@ import requests
 import json
 import urllib
 from threading import Thread
+from glob2 import glob
 
 class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                        octoprint.plugin.TemplatePlugin,
@@ -149,11 +150,29 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
     def _update_worker(self):
         self._logger.info("Updating now...")
+
+        try:
+            port = glob('/dev/ttyACM*')[0]
+        except IndexError:
+            self.isUpdating = False
+            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="No ports exist."))
+            raise RuntimeError('No ports detected')
+
         try:
             os.remove(os.path.join(os.path.expanduser('~'), 'Marlin/.build_log'))
         except OSError:
             pass
         self.f = open(os.path.join(os.path.expanduser('~'), 'Marlin/.build_log'), "w")
+        try:
+            s = Serial(port, 115200)
+        except SerialException as e:
+            self.isUpdating = False
+            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason=str(e)))
+            raise RuntimeError(str(e))
+        s.setDTR(False)
+        sleep(0.1)
+        s.setDTR(True)
+        s.close()
         pro = Popen("cd ~/Marlin/; avrdude -p m2560 -P /dev/ttyACM0 -c stk500v2 -b 250000 -D -U flash:w:./.build/mega2560/firmware.hex:i", stdout=self.f, stderr=self.f, shell=True, preexec_fn=os.setsid)
         self.updatePID = pro.pid
         self.startTimer(1.0)
