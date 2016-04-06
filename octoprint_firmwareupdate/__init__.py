@@ -44,13 +44,13 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         )
 
     def on_api_command(self, command, data):
-    	if command == "update_firmware":
+        if command == "update_firmware":
             self._update_firmware_init_thread = Thread(target=self._update_firmware_init)
             self._update_firmware_init_thread.daemon = True
             self._update_firmware_init_thread.start()
 
-    	else:
-    	    self._logger.info("Uknown command.")
+        else:
+            self._logger.info("Uknown command.")
 
     def on_api_get(self, request):
         return flask.jsonify(status=self.isUpdating)
@@ -62,57 +62,57 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     def checkStatus(self):
         update_result = open('/home/pi/Marlin/.build_log').read()
         if 'No device matching following was found' in update_result:
-    	    self._logger.info("Failed update...")
+            self._logger.info("Failed update...")
             self.isUpdating = False
-    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="A connected device was not found."))
+            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="A connected device was not found."))
             self._clean_up()
-    	    return False
-    	elif 'FAILED' in update_result:
-    	    self._logger.info("Failed update...")
+            return False
+        elif 'FAILED' in update_result:
+            self._logger.info("Failed update...")
             self.isUpdating = False
-    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed"))
+            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed"))
             self._clean_up()
-    	    return False
-    	elif 'bytes of flash verified' in update_result and 'successfully' in update_result :
+            return False
+        elif 'bytes of flash verified' in update_result and 'avrdude done' in update_result :
             self._logger.info("Successful update!")
-    	    self.isUpdating = False
+            self.isUpdating = False
             for line in update_result:
                 if "Reading" in line:
                     self.completion_time = find_between( line, " ", "s" )
-    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed"), completion_time=self.completion_time)
+                    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed"), completion_time=self.completion_time)
             self._clean_up()
-    	    return False
-    	elif 'ReceiveMessage(): timeout' in update_result:
-    	    self._logger.info("Update timed out. Check if port is already in use!")
-    	    self.isUpdating = False
-    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Device timed out. Please check that the port is not in use!"))
-    	    p = psutil.Process(self.updatePID)
-    	    for child in p.children(recursive=True):
-        	    child.kill()
-    	    p.kill()
+            return False
+        elif 'ReceiveMessage(): timeout' in update_result:
+            self._logger.info("Update timed out. Check if port is already in use!")
+            self.isUpdating = False
+            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Device timed out. Please check that the port is not in use!"))
+            p = psutil.Process(self.updatePID)
+            for child in p.children(recursive=True):
+                child.kill()
+                p.kill()
             self._clean_up()
-    	    return False
-    	elif 'error:' in update_result:
-    	    error_list = []
+            return False
+        elif 'error:' in update_result:
+            error_list = []
             with open('/home/pi/Marlin/.build_log') as myFile:
-    		for num, line in enumerate(myFile, 1):
-    		    if 'error:' in line:
-    			    error_list.append(line)
-    	    compileError = '<pre>' + ''.join(error_list) + '</pre>'
-    	    self._logger.info("Update failed. Compiling error.")
-    	    self.isUpdating = False
-    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason=compileError))
-    	    self._clean_up()
+                for num, line in enumerate(myFile, 1):
+                    if 'error:' in line:
+                        error_list.append(line)
+                        compileError = '<pre>' + ''.join(error_list) + '</pre>'
+                        self._logger.info("Update failed. Compiling error.")
+                        self.isUpdating = False
+                        self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason=compileError))
+                        self._clean_up()
             return False
-    	elif 'Make failed' in update_result:
-    	    self._logger.info("Update failed. Compiling error.")
-    	    self.isUpdating = False
-    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Build failed."))
-    	    self._clean_up()
+        elif 'Make failed' in update_result:
+            self._logger.info("Update failed. Compiling error.")
+            self.isUpdating = False
+            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Build failed."))
+            self._clean_up()
             return False
-    	else:
-    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="continue"))
-    	    return True
+        else:
+            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="continue"))
+            return True
 
     def _update_firmware_init(self):
         marlin_dir = os.path.join(os.path.expanduser('~'), 'Marlin/.build/')
@@ -186,7 +186,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     def get_template_configs(self):
         return [
             dict(type="settings", name="Firmware Update", data_bind="visible: loginState.isAdmin()"),
-	    ]
+            ]
 
     def get_update_information(self):
         return dict(
@@ -204,10 +204,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 __plugin_name__ = "Firmware Update Plugin"
 
 def __plugin_load__():
-	global __plugin_implementation__
-	__plugin_implementation__ = FirmwareUpdatePlugin()
+    global __plugin_implementation__
+    __plugin_implementation__ = FirmwareUpdatePlugin()
 
-	global __plugin_hooks__
-	__plugin_hooks__ = {
-		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
-	}
+    global __plugin_hooks__
+    __plugin_hooks__ = {
+    "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
+    }
