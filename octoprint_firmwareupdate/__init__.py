@@ -30,6 +30,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         self.firmware_file = None
         self._checkTimer = None
         self.updatePID = None
+        self.f = None
 
     def get_assets(self):
         return {
@@ -63,19 +64,19 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     	    self._logger.info("Failed update...")
             self.isUpdating = False
     	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="A connected device was not found."))
-            os.remove(self.firmware_file)
+            self._clean_up()
     	    return False
     	elif 'FAILED' in update_result:
     	    self._logger.info("Failed update...")
             self.isUpdating = False
     	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed"))
-            os.remove(self.firmware_file)
+            self._clean_up()
     	    return False
     	elif 'bytes of flash verified' in update_result and 'successfully' in update_result :
             self._logger.info("Successful update!")
     	    self.isUpdating = False
     	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed"))
-            os.remove(self.firmware_file)
+            self._clean_up()
     	    return False
     	elif 'ReceiveMessage(): timeout' in update_result:
     	    self._logger.info("Update timed out. Check if port is already in use!")
@@ -85,7 +86,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     	    for child in p.children(recursive=True):
         	    child.kill()
     	    p.kill()
-            os.remove(self.firmware_file)
+            self._clean_up()
     	    return False
     	elif 'error:' in update_result:
     	    error_list = []
@@ -97,13 +98,13 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     	    self._logger.info("Update failed. Compiling error.")
     	    self.isUpdating = False
     	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason=compileError))
-    	    os.remove(self.firmware_file)
+    	    self._clean_up()
             return False
     	elif 'Make failed' in update_result:
     	    self._logger.info("Update failed. Compiling error.")
     	    self.isUpdating = False
     	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Build failed."))
-    	    os.remove(self.firmware_file)
+    	    self._clean_up()
             return False
     	else:
     	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="continue"))
@@ -159,10 +160,16 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             os.remove(os.path.join(os.path.expanduser('~'), 'Marlin/.build_log'))
         except OSError:
             pass
-        f = open("/home/pi/Marlin/.build_log", "w")
-        pro = Popen("cd ~/Marlin/; avrdude -p m2560 -P /dev/ttyACM0 -c stk500v2 -b 250000 -D -U flash:w:./.build/mega2560/firmware.hex:i", stdout=f, stderr=f, shell=True, preexec_fn=os.setsid)
+        self.f = open("/home/pi/Marlin/.build_log", "w")
+        pro = Popen("cd ~/Marlin/; avrdude -p m2560 -P /dev/ttyACM0 -c stk500v2 -b 250000 -D -U flash:w:./.build/mega2560/firmware.hex:i", stdout=self.f, stderr=self.f, shell=True, preexec_fn=os.setsid)
         self.updatePID = pro.pid
         self.startTimer(1.0)
+
+    def _clean_up(self):
+        if self.f is not None:
+            if not self.f.closed:
+                self.f.close()
+        os.remove(self.firmware_file)
 
     def get_template_configs(self):
         return [
