@@ -78,8 +78,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             self.isUpdating = False
             for line in update_result.splitlines():
                 if "Reading" in line:
-                    self.completion_time = find_between( line, " ", "s" )
-                    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed"), completion_time=self.completion_time)
+                    self.completion_time = self.find_between( line, " ", "s" )
+                    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed", completion_time=self.completion_time))
             self._clean_up()
             return False
         elif 'ReceiveMessage(): timeout' in update_result:
