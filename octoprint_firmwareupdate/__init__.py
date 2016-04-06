@@ -97,6 +97,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         results = pipe.communicate()
         stdout = results[0]
         stderr = results[1]
+        self._logger.info(stdout)
+        self._logger.info(stderr)
 
         if 'bytes of flash verified' in stdout and 'successfully' in stdout:
             self._logger.info("Successful update!")
