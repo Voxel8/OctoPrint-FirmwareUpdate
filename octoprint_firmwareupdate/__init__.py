@@ -60,7 +60,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         self._checkTimer.start()
 
     def checkStatus(self):
-        update_result = open('/home/pi/Marlin/.build_log').read()
+        update_result = open(os.path.join(os.path.expanduser('~'), 'Marlin/.build_log')).read()
         if 'No device matching following was found' in update_result:
             self._logger.info("Failed update...")
             self.isUpdating = False
@@ -76,7 +76,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         elif 'bytes of flash verified' in update_result and 'avrdude done' in update_result :
             self._logger.info("Successful update!")
             self.isUpdating = False
-            for line in update_result:
+            for line in update_result.splitlines():
                 if "Reading" in line:
                     self.completion_time = find_between( line, " ", "s" )
                     self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed"), completion_time=self.completion_time)
@@ -90,24 +90,6 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             for child in p.children(recursive=True):
                 child.kill()
                 p.kill()
-            self._clean_up()
-            return False
-        elif 'error:' in update_result:
-            error_list = []
-            with open('/home/pi/Marlin/.build_log') as myFile:
-                for num, line in enumerate(myFile, 1):
-                    if 'error:' in line:
-                        error_list.append(line)
-                        compileError = '<pre>' + ''.join(error_list) + '</pre>'
-                        self._logger.info("Update failed. Compiling error.")
-                        self.isUpdating = False
-                        self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason=compileError))
-                        self._clean_up()
-            return False
-        elif 'Make failed' in update_result:
-            self._logger.info("Update failed. Compiling error.")
-            self.isUpdating = False
-            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Build failed."))
             self._clean_up()
             return False
         else:
@@ -164,7 +146,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             os.remove(os.path.join(os.path.expanduser('~'), 'Marlin/.build_log'))
         except OSError:
             pass
-        self.f = open("/home/pi/Marlin/.build_log", "w")
+        self.f = open(os.path.join(os.path.expanduser('~'), 'Marlin/.build_log'), "w")
         pro = Popen("cd ~/Marlin/; avrdude -p m2560 -P /dev/ttyACM0 -c stk500v2 -b 250000 -D -U flash:w:./.build/mega2560/firmware.hex:i", stdout=self.f, stderr=self.f, shell=True, preexec_fn=os.setsid)
         self.updatePID = pro.pid
         self.startTimer(1.0)
