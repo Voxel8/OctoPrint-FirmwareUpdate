@@ -81,10 +81,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             for line in update_result.splitlines():
                 if "Reading" in line:
                     self.read_time = self.find_between( line, " ", "s" )
-                    self.completion_time += float(read_time)
+                    self.completion_time += float(self.read_time)
                 elif "Writing" in line:
                     self.write_time = self.find_between( line, " ", "s" )
-                    self.completion_time += float(write_time)
+                    self.completion_time += float(self.write_time)
 
             self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed", completion_time=self.completion_time))
             self._clean_up()
