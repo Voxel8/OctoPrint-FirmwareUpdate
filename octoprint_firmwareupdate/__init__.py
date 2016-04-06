@@ -31,6 +31,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         self._checkTimer = None
         self.updatePID = None
         self.f = None
+        self.completion_time = None
 
     def get_assets(self):
         return {
@@ -75,7 +76,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     	elif 'bytes of flash verified' in update_result and 'successfully' in update_result :
             self._logger.info("Successful update!")
     	    self.isUpdating = False
-    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed"))
+            for line in update_result:
+                if "Reading" in line:
+                    self.completion_time = find_between( line, " ", "s" )
+    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed"), completion_time=self.completion_time)
             self._clean_up()
     	    return False
     	elif 'ReceiveMessage(): timeout' in update_result:
@@ -164,6 +168,14 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         pro = Popen("cd ~/Marlin/; avrdude -p m2560 -P /dev/ttyACM0 -c stk500v2 -b 250000 -D -U flash:w:./.build/mega2560/firmware.hex:i", stdout=self.f, stderr=self.f, shell=True, preexec_fn=os.setsid)
         self.updatePID = pro.pid
         self.startTimer(1.0)
+
+    def find_between(self, s, first, last ):
+        try:
+            start = s.rindex( first ) + len( first )
+            end = s.rindex( last, start )
+            return s[start:end]
+        except ValueError:
+            return ""
 
     def _clean_up(self):
         if self.f is not None:

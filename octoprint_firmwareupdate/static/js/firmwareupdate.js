@@ -80,7 +80,7 @@ $(function() {
           $("#printer_connect").prop("disabled", false);
           self._showPopup({
             title: gettext("Update complete."),
-            text: gettext("The firmware on your printer has been successfully updated!"),
+            text: gettext("The firmware on your printer has been successfully updated after " + data.completion_time + " seconds."),
             type: "success",
             hide: false,
             buttons: {
