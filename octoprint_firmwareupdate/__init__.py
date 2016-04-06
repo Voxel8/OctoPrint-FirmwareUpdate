@@ -74,6 +74,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             self.firmware_file = os.path.join(os.path.expanduser('~'), 'Marlin/.build/firmware.hex')
             urllib.urlretrieve(rjson['assets'][0]['browser_download_url'], self.firmware_file)
             if os.path.isfile(self.firmware_file):
+                self.isUpdating = True
                 self._logger.info("File downloaded, continuing...")
                 self._update_firmware("github")
             else:
@@ -85,7 +86,6 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             # TODO: Update this error message to be more helpful
             self._logger.info("Something doesn't make sense here...")
         else:
-            self.isUpdating = True
             self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, createPopup="yes"))
             self._update_firmware_thread = Thread(target=self._update_worker)
             self._update_firmware_thread.daemon = True
