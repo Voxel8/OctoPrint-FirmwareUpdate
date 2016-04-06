@@ -19,6 +19,7 @@ import json
 import urllib
 from threading import Thread
 from glob import glob
+from serial import Serial, SerialException
 
 class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                        octoprint.plugin.TemplatePlugin,
