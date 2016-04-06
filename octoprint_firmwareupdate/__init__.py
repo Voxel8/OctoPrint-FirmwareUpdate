@@ -86,7 +86,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                     self.write_time = self.find_between( line, " ", "s" )
                     self.completion_time += float(self.write_time)
 
-            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed", completion_time=self.completion_time))
+            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed", completion_time=round(self.completion_time, 2)))
             self._clean_up()
             return False
         elif 'ReceiveMessage(): timeout' in update_result:
