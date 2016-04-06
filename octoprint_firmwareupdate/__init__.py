@@ -114,7 +114,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     	    self._logger.info("Failed update...")
             self.isUpdating = False
     	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed"))
-        elif 'ReceiveMessage(): timeout' in update_result:
+        elif 'ReceiveMessage(): timeout' in stderr:
     	    self._logger.info("Update timed out. Check if port is already in use!")
     	    self.isUpdating = False
     	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Device timed out. Please check that the port is not in use!"))
