@@ -93,7 +93,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
     def _update_worker(self):
         self._logger.info("Updating now...")
-        pipe = Popen("cd ~/Marlin/; avrdude -p m2560 -c stk500v2 -e -U flash:w:firmware.hex", shell=True, stdout=PIPE, stderr=PIPE)
+        pipe = Popen("cd ~/Marlin/; avrdude -p m2560 -c stk500v2 -e -U flash:w:firmware.hex -P /dev/ttyACM0", shell=True, stdout=PIPE, stderr=PIPE)
         results = pipe.communicate()
         stdout = results[0]
         stderr = results[1]
