@@ -1,31 +1,29 @@
 # coding=utf-8
 from __future__ import absolute_import
 
-__author__ = "Kevin Murphy <kevin@voxel8.co>"
-__license__ = "GNU Affero General Public License http://www.gnu.org/licenses/agpl.html"
-__copyright__ = "Copyright (C) 2015 Kevin Murphy - Released under terms of the AGPLv3 License"
-
 import octoprint.plugin
 from octoprint.util import RepeatedTimer
 import flask
 import os
-from subprocess import Popen, PIPE
-import signal
-import linecache
+from subprocess import Popen
 import psutil
-import time
+from time import sleep
 import requests
-import json
 import urllib
 from threading import Thread
 from glob import glob
 from serial import Serial, SerialException
 
+__author__ = "Kevin Murphy <kevin@voxel8.co>"
+__license__ = "GNU Affero General Public License http://www.gnu.org/licenses/agpl.html"
+__copyright__ = "Copyright (C) 2015 Kevin Murphy - Released under terms of the AGPLv3 License"
+
+
 class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
-                       octoprint.plugin.TemplatePlugin,
-                       octoprint.plugin.AssetPlugin,
-                       octoprint.plugin.SettingsPlugin,
-                       octoprint.plugin.SimpleApiPlugin):
+                           octoprint.plugin.TemplatePlugin,
+                           octoprint.plugin.AssetPlugin,
+                           octoprint.plugin.SettingsPlugin,
+                           octoprint.plugin.SimpleApiPlugin):
 
     def __init__(self):
         self.isUpdating = False
@@ -77,15 +75,15 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed"))
             self._clean_up()
             return False
-        elif 'bytes of flash verified' in update_result and 'avrdude done' in update_result :
+        elif 'bytes of flash verified' in update_result and 'avrdude done' in update_result:
             self._logger.info("Successful update!")
             self.isUpdating = False
             for line in update_result.splitlines():
                 if "Reading" in line:
-                    self.read_time = self.find_between( line, " ", "s" )
+                    self.read_time = self.find_between(line, " ", "s")
                     self.completion_time += float(self.read_time)
                 elif "Writing" in line:
-                    self.write_time = self.find_between( line, " ", "s" )
+                    self.write_time = self.find_between(line, " ", "s")
                     self.completion_time += float(self.write_time)
 
             self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed", completion_time=round(self.completion_time, 2)))
@@ -113,7 +111,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                 file_exists = True
             else:
                 file_exists = False
-        else :
+        else:
             file_exists = False
 
         if file_exists:
@@ -178,10 +176,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         self.updatePID = pro.pid
         self.startTimer(1.0)
 
-    def find_between(self, s, first, last ):
+    def find_between(self, s, first, last):
         try:
-            start = s.rindex( first ) + len( first )
-            end = s.rindex( last, start )
+            start = s.rindex(first) + len(first)
+            end = s.rindex(last, start)
             return s[start:end]
         except ValueError:
             return ""
@@ -212,11 +210,12 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
 __plugin_name__ = "Firmware Update Plugin"
 
+
 def __plugin_load__():
     global __plugin_implementation__
     __plugin_implementation__ = FirmwareUpdatePlugin()
 
     global __plugin_hooks__
     __plugin_hooks__ = {
-    "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
+        "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
     }
