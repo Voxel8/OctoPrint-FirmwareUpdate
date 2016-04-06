@@ -12,6 +12,7 @@ import urllib
 from threading import Thread
 from glob import glob
 from serial import Serial, SerialException
+from octoprint.events import eventManager, Events
 
 __author__ = "Kevin Murphy <kevin@voxel8.co>"
 __license__ = "GNU Affero General Public License http://www.gnu.org/licenses/agpl.html"
@@ -33,6 +34,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         self.completion_time = 0
         self.write_time = None
         self.read_time = None
+        self.port = None
 
     def get_assets(self):
         return {
@@ -144,8 +146,11 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     def _update_worker(self):
         self._logger.info("Updating now...")
 
+        # Ensure disconnected
+        self.disconnect()
+
         try:
-            port = glob('/dev/ttyACM*')[0]
+            self.port = glob('/dev/ttyACM*')[0]
         except IndexError:
             self.isUpdating = False
             self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="No ports exist."))
@@ -157,7 +162,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             pass
         self.f = open(os.path.join(os.path.expanduser('~'), 'Marlin/.build_log'), "w")
         try:
-            s = Serial(port, 115200)
+            s = Serial(self.port, 115200)
         except SerialException as e:
             self.isUpdating = False
             self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason=str(e)))
@@ -183,6 +188,25 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             if not self.f.closed:
                 self.f.close()
         os.remove(self.firmware_file)
+
+        # Reconnect the printer
+        self.connect(self.port, 250000)
+
+    def connect(self, port=None, baudrate=None, profile=None):
+        if self._comm is not None:
+            self._comm.close()
+        self._printerProfileManager.select(profile)
+        self._comm = comm.MachineCom(port, baudrate, callbackObject=self, printerProfileManager=self._printerProfileManager)
+
+    def disconnect(self):
+        """
+        Closes the connection to the printer.
+        """
+        if self._comm is not None:
+            self._comm.close()
+        self._comm = None
+        self._printerProfileManager.deselect()
+        eventManager().fire(Events.DISCONNECTED)
 
     def get_template_configs(self):
         return [
