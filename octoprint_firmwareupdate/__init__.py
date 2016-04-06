@@ -97,13 +97,30 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         results = pipe.communicate()
         stdout = results[0]
         stderr = results[1]
-        if 'Permission denied' in stderr:
+
+        if 'bytes of flash verified' in stdout and 'successfully' in stdout:
+            self._logger.info("Successful update!")
+            self.isUpdating = False
+    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed"))
+        elif 'Permission denied' in stderr:
             self._logger.info("Permission denied. No port available.")
             self.isUpdating = False
     	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="A connected device was not found."))
+        elif 'No device matching following was found' in stderr:
+    	    self._logger.info("Failed update...")
+            self.isUpdating = False
+    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="A connected device was not found."))
+    	elif 'FAILED' in stderr:
+    	    self._logger.info("Failed update...")
+            self.isUpdating = False
+    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed"))
+        elif 'ReceiveMessage(): timeout' in update_result:
+    	    self._logger.info("Update timed out. Check if port is already in use!")
+    	    self.isUpdating = False
+    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Device timed out. Please check that the port is not in use!"))
         else:
             self.isUpdating = False
-    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed"))
+    	    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Unknown error occurred."))
         # Clean up firmware files
         os.remove(self.firmware_file)
 
