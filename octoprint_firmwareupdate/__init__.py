@@ -74,7 +74,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             self.firmware_directory = os.path.join(os.path.expanduser('~'), 'Marlin/.build/mega2560/')
             if not os.path.exists(self.firmware_directory):
                 os.makedirs(self.firmware_directory)
-            self.firmware_file = os.path.join(self.firmware_directory, 'Marlin/.build/mega2560/firmware.hex')
+            self.firmware_file = os.path.join(self.firmware_directory, 'firmware.hex')
             urllib.urlretrieve(rjson['assets'][0]['browser_download_url'], self.firmware_file)
             if os.path.isfile(self.firmware_file):
                 self.isUpdating = True
