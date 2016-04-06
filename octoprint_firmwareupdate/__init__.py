@@ -12,7 +12,7 @@ import urllib
 from threading import Thread
 from glob import glob
 from serial import Serial, SerialException
-from octoprint.events import eventManager, Events
+import yaml
 
 __author__ = "Kevin Murphy <kevin@voxel8.co>"
 __license__ = "GNU Affero General Public License http://www.gnu.org/licenses/agpl.html"
@@ -146,9 +146,6 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     def _update_worker(self):
         self._logger.info("Updating now...")
 
-        # Ensure disconnected
-        self.disconnect()
-
         try:
             self.port = glob('/dev/ttyACM*')[0]
         except IndexError:
@@ -189,24 +186,20 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                 self.f.close()
         os.remove(self.firmware_file)
 
-        # Reconnect the printer
-        self.connect(self.port, 250000)
+        self._action('connect')
 
-    def connect(self, port=None, baudrate=None, profile=None):
-        if self._comm is not None:
-            self._comm.close()
-        self._printerProfileManager.select(profile)
-        self._comm = comm.MachineCom(port, baudrate, callbackObject=self, printerProfileManager=self._printerProfileManager)
+    def _action(self, name):
+        r = requests.post(
+            'http://localhost:5000/api/system',
+            data={'action': name},
+            headers={'X-API-KEY': self._get_api_key()}
+        )
+        self._logger.info(r)
 
-    def disconnect(self):
-        """
-        Closes the connection to the printer.
-        """
-        if self._comm is not None:
-            self._comm.close()
-        self._comm = None
-        self._printerProfileManager.deselect()
-        eventManager().fire(Events.DISCONNECTED)
+    def _get_api_key(self):
+        with open(os.path.join(os.path.expanduser('~'), '.octoprint/config.yaml')) as f:
+            self._api_key = yaml.load(f)['api']['key']
+        return self._api_key
 
     def get_template_configs(self):
         return [
