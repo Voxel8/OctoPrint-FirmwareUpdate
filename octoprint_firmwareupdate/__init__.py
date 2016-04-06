@@ -31,7 +31,9 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         self._checkTimer = None
         self.updatePID = None
         self.f = None
-        self.completion_time = None
+        self.completion_time = 0
+        self.write_time = None
+        self.read_time = None
 
     def get_assets(self):
         return {
@@ -78,8 +80,13 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             self.isUpdating = False
             for line in update_result.splitlines():
                 if "Reading" in line:
-                    self.completion_time = self.find_between( line, " ", "s" )
-                    self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed", completion_time=self.completion_time))
+                    self.read_time = self.find_between( line, " ", "s" )
+                    self.completion_time += float(read_time)
+                elif "Writing" in line:
+                    self.write_time = self.find_between( line, " ", "s" )
+                    self.completion_time += float(write_time)
+
+            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed", completion_time=self.completion_time))
             self._clean_up()
             return False
         elif 'ReceiveMessage(): timeout' in update_result:
