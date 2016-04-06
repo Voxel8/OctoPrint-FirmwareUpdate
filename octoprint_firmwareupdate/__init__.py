@@ -2,7 +2,6 @@
 from __future__ import absolute_import
 
 import octoprint.plugin
-from octoprint.util import RepeatedTimer
 import flask
 import os
 from subprocess import Popen
@@ -57,51 +56,46 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     def on_api_get(self, request):
         return flask.jsonify(status=self.isUpdating)
 
-    def startTimer(self, interval):
-        self._checkTimer = RepeatedTimer(interval, self.checkStatus, run_first=True, condition=self.checkStatus)
-        self._checkTimer.start()
-
     def checkStatus(self):
-        update_result = open(os.path.join(os.path.expanduser('~'), 'Marlin/.build_log')).read()
-        if 'No device matching following was found' in update_result:
-            self._logger.info("Failed update...")
-            self.isUpdating = False
-            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="A connected device was not found."))
-            self._clean_up()
-            return False
-        elif 'FAILED' in update_result:
-            self._logger.info("Failed update...")
-            self.isUpdating = False
-            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed"))
-            self._clean_up()
-            return False
-        elif 'bytes of flash verified' in update_result and 'avrdude done' in update_result:
-            self._logger.info("Successful update!")
-            self.isUpdating = False
-            for line in update_result.splitlines():
-                if "Reading" in line:
-                    self.read_time = self.find_between(line, " ", "s")
-                    self.completion_time += float(self.read_time)
-                elif "Writing" in line:
-                    self.write_time = self.find_between(line, " ", "s")
-                    self.completion_time += float(self.write_time)
+        while True:
+            update_result = open(os.path.join(os.path.expanduser('~'), 'Marlin/.build_log')).read()
+            if 'No device matching following was found' in update_result:
+                self._logger.info("Failed update...")
+                self.isUpdating = False
+                self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="A connected device was not found."))
+                self._clean_up()
+                break
+            elif 'FAILED' in update_result:
+                self._logger.info("Failed update...")
+                self.isUpdating = False
+                self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed"))
+                self._clean_up()
+                break
+            elif 'bytes of flash verified' in update_result and 'avrdude done' in update_result:
+                self._logger.info("Successful update!")
+                self.isUpdating = False
+                for line in update_result.splitlines():
+                    if "Reading" in line:
+                        self.read_time = self.find_between(line, " ", "s")
+                        self.completion_time += float(self.read_time)
+                    elif "Writing" in line:
+                        self.write_time = self.find_between(line, " ", "s")
+                        self.completion_time += float(self.write_time)
 
-            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed", completion_time=round(self.completion_time, 2)))
-            self._clean_up()
-            return False
-        elif 'ReceiveMessage(): timeout' in update_result:
-            self._logger.info("Update timed out. Check if port is already in use!")
-            self.isUpdating = False
-            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Device timed out. Please check that the port is not in use!"))
-            p = psutil.Process(self.updatePID)
-            for child in p.children(recursive=True):
-                child.kill()
-                p.kill()
-            self._clean_up()
-            return False
-        else:
-            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="continue"))
-            return True
+                self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed", completion_time=round(self.completion_time, 2)))
+                self._clean_up()
+                break
+            elif 'ReceiveMessage(): timeout' in update_result:
+                self._logger.info("Update timed out. Check if port is already in use!")
+                self.isUpdating = False
+                self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Device timed out. Please check that the port is not in use!"))
+                p = psutil.Process(self.updatePID)
+                for child in p.children(recursive=True):
+                    child.kill()
+                    p.kill()
+                self._clean_up()
+                break
+            sleep(1)
 
     def _update_firmware_init(self):
         marlin_dir = os.path.join(os.path.expanduser('~'), 'Marlin/.build/')
@@ -174,7 +168,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         s.close()
         pro = Popen("cd ~/Marlin/; avrdude -p m2560 -P /dev/ttyACM0 -c stk500v2 -b 250000 -D -U flash:w:./.build/mega2560/firmware.hex:i", stdout=self.f, stderr=self.f, shell=True, preexec_fn=os.setsid)
         self.updatePID = pro.pid
-        self.startTimer(1.0)
+        self.checkStatus()
 
     def find_between(self, s, first, last):
         try:
