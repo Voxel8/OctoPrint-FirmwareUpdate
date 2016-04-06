@@ -18,7 +18,7 @@ import requests
 import json
 import urllib
 from threading import Thread
-from glob2 import glob
+from glob import glob
 
 class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                        octoprint.plugin.TemplatePlugin,
