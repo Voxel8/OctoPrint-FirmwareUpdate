@@ -65,13 +65,16 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         if file_exists:
             self.isUpdating = True
             self._logger.info("Updating using " + filenames[0])
-            self.firmware_file = os.path.join(os.path.expanduser('~'), 'Marlin/.build/' + filenames[0])
+            self.firmware_file = os.path.join(os.path.expanduser('~'), 'Marlin/.build/mega2560/' + filenames[0])
             self._update_firmware("local")
         else:
             self._logger.info("No files exist, grabbing latest from GitHub")
             r = requests.get('https://api.github.com/repos/Voxel8/Marlin/releases/latest')
             rjson = r.json()
-            self.firmware_file = os.path.join(os.path.expanduser('~'), 'Marlin/.build/firmware.hex')
+            self.firmware_directory = os.path.join(os.path.expanduser('~'), 'Marlin/.build/mega2560/')
+            if not os.path.exists(self.firmware_directory):
+                os.makedirs(self.firmware_directory)
+            self.firmware_file = os.path.join(self.firmware_directory, 'Marlin/.build/mega2560/firmware.hex')
             urllib.urlretrieve(rjson['assets'][0]['browser_download_url'], self.firmware_file)
             if os.path.isfile(self.firmware_file):
                 self.isUpdating = True
@@ -93,7 +96,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
     def _update_worker(self):
         self._logger.info("Updating now...")
-        pipe = Popen("cd ~/Marlin/; avrdude -p m2560 -c stk500v2 -e -U flash:w:firmware.hex -P /dev/ttyACM0", shell=True, stdout=PIPE, stderr=PIPE)
+        pipe = Popen("cd ~/Marlin/; avrdude -p m2560 -P /dev/ttyACM0 -c stk500v2 -b 250000 -D -U flash:w:./.build/mega2560/firmware.hex:i", shell=True, stdout=PIPE, stderr=PIPE)
         results = pipe.communicate()
         stdout = results[0]
         stderr = results[1]
