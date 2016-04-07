@@ -4,13 +4,20 @@ $(function() {
 
     self.printerState = parameters[0];
     self.loginState = parameters[1];
-    self.connectionState = parameters[2];
+    self.connection = parameters[2];
     self.settings = parameters[3];
     self.popup = undefined;
     self.isUpdating = ko.observable(undefined);
+    self.connection.isUpdating = self.isUpdating;
     self.enableUpdating = ko.computed(function() {
       return self.isUpdating() == false ? true : false;
     });
+
+    self.connection.onBeforeBinding = function () {
+        $("#printer_connect").attr("data-bind", function() {
+          return $(this).attr("data-bind").replace(/enable: loginState.isUser()/g, "enable: loginState.isUser() && !isUpdating");
+        });
+      };
 
     self._showPopup = function(options, eventListeners) {
       self._closePopup();
@@ -54,7 +61,6 @@ $(function() {
         self.isUpdating(data.isUpdating);
         if (data.status == "error") {
           if (data.message) {
-            $("#printer_connect").prop("disabled", false);
             self._showPopup({
               title: gettext("Update failed!"),
               text: gettext("Updating your printer firmware was not successful.<br>" + pnotifyAdditionalInfo(data.message)),
@@ -65,7 +71,6 @@ $(function() {
               }
             });
           } else {
-            $("#printer_connect").prop("disabled", false);
             self._showPopup({
               title: gettext("Update failed!"),
               text: gettext("Updating your printer firmware was not successful."),
@@ -77,7 +82,6 @@ $(function() {
             });
           }
         } else if (data.status == "completed") {
-          $("#printer_connect").prop("disabled", false);
           self._showPopup({
             title: gettext("Update complete."),
             text: gettext("The firmware on your printer has been successfully updated after " + data.message + " seconds."),
@@ -88,7 +92,6 @@ $(function() {
             }
           });
         } else if (data.status == "inprogress") {
-          $("#printer_connect").prop("disabled", true);
           self._showPopup({
             title: gettext("Updating..."),
             text: gettext("Now updating, please wait."),
@@ -110,7 +113,6 @@ $(function() {
     }
 
     self.update_firmware = function() {
-      $("#printer_connect").prop("disabled", true);
       $.ajax({
         type: "POST",
         url: "/api/plugin/firmwareupdate",
@@ -134,7 +136,6 @@ $(function() {
         success: function(data) {
           self.isUpdating(data.isUpdating);
           if (data.isUpdating) {
-            $("#printer_connect").prop("disabled", true);
             self._showPopup({
               title: gettext("Updating..."),
               text: gettext("Now updating, please wait."),
