@@ -132,6 +132,7 @@ $(function() {
           console.log('error');
         },
         success: function(data) {
+          self.isUpdating(data.isUpdating);
           if (data.isUpdating) {
             $("#printer_connect").prop("disabled", true);
             self._showPopup({
