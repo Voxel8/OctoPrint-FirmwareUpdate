@@ -12,7 +12,10 @@ import urllib
 from threading import Thread
 from glob import glob
 from serial import Serial, SerialException
-import yaml
+from octoprint.events import eventManager, Events
+
+Events.FIRMWARE_UPDATING = "FirmwareUpdating"
+Events.FIRMWARE_UPDATED = "FirmwareUpdated"
 
 __author__ = "Kevin Murphy <kevin@voxel8.co>"
 __license__ = "GNU Affero General Public License http://www.gnu.org/licenses/agpl.html"
@@ -112,6 +115,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
         if file_exists:
             self.isUpdating = True
+            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, createPopup="yes"))
+            eventManager().fire(Events.FIRMWARE_UPDATING)
             self._logger.info("Updating using " + filenames[0])
             self.firmware_file = os.path.join(os.path.expanduser('~'), 'Marlin/.build/mega2560/' + filenames[0])
             self._update_firmware("local")
@@ -119,6 +124,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             self._logger.info("No files exist, grabbing latest from GitHub")
             self.isUpdating = True
             self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, createPopup="yes"))
+            eventManager().fire(Events.FIRMWARE_UPDATING)
             r = requests.get('https://api.github.com/repos/Voxel8/Marlin/releases/latest')
             rjson = r.json()
             self.firmware_directory = os.path.join(os.path.expanduser('~'), 'Marlin/.build/mega2560/')
@@ -185,21 +191,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             if not self.f.closed:
                 self.f.close()
         os.remove(self.firmware_file)
-
-        self._action('connect')
-
-    def _action(self, name):
-        r = requests.post(
-            'http://localhost:5000/api/system',
-            data={'action': name},
-            headers={'X-API-KEY': self._get_api_key()}
-        )
-        self._logger.info(r)
-
-    def _get_api_key(self):
-        with open(os.path.join(os.path.expanduser('~'), '.octoprint/config.yaml')) as f:
-            self._api_key = yaml.load(f)['api']['key']
-        return self._api_key
+        eventManager().fire(Events.FIRMWARE_UPDATED)
 
     def get_template_configs(self):
         return [
