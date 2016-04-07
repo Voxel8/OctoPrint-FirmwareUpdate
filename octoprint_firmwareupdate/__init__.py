@@ -99,6 +99,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             sleep(1)
 
     def _update_firmware_init(self):
+        if self.printer_is_printing():
+            self._update_status(False, "error", "Printer is in use.")
+            raise RuntimeError("Printer is in use - cannot continue")
+
         self.firmware_directory = os.path.join(os.path.expanduser('~'), 'Marlin/.build/mega2560/')
         self.src_directory = os.path.join(os.path.expanduser('~'), 'Marlin/src')
         if not os.path.exists(self.firmware_directory):
@@ -181,6 +185,12 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
     def _update_status(self, isUpdating, status=None, message=None):
         self.isUpdating = isUpdating
+        # Reconnect again after no longer updating
+        if not self.isUpdating:
+            self._printer.connect()
+        else:
+            self._printer.disconnect()
+
         self._plugin_manager.send_plugin_message(self._identifier, dict(isUpdating=self.isUpdating, status=status, message=message))
         payload = {'isUpdating': self.isUpdating, 'status': status, 'message': message}
         eventManager().fire(Events.FIRMWARE_UPDATE, payload)
@@ -190,6 +200,11 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             if not self.f.closed:
                 self.f.close()
         os.remove(self.firmware_file)
+
+    def printer_is_printing(self):
+        if self._printer.is_printing() or self._printer.is_paused():
+            return True
+        return False
 
     def get_template_configs(self):
         return [
