@@ -116,7 +116,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         if file_exists:
             self.isUpdating = True
             self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, createPopup="yes"))
-            eventManager().fire(Events.FIRMWARE_UPDATING)
+            payload = {'status': self.isUpdating}
+            eventManager().fire(Events.FIRMWARE_UPDATING, payload)
             self._logger.info("Updating using " + filenames[0])
             self.firmware_file = os.path.join(os.path.expanduser('~'), 'Marlin/.build/mega2560/' + filenames[0])
             self._update_firmware("local")
@@ -124,7 +125,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             self._logger.info("No files exist, grabbing latest from GitHub")
             self.isUpdating = True
             self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, createPopup="yes"))
-            eventManager().fire(Events.FIRMWARE_UPDATING)
+            payload = {'status': self.isUpdating}
+            eventManager().fire(Events.FIRMWARE_UPDATING, payload)
             r = requests.get('https://api.github.com/repos/Voxel8/Marlin/releases/latest')
             rjson = r.json()
             self.firmware_directory = os.path.join(os.path.expanduser('~'), 'Marlin/.build/mega2560/')
@@ -191,7 +193,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             if not self.f.closed:
                 self.f.close()
         os.remove(self.firmware_file)
-        eventManager().fire(Events.FIRMWARE_UPDATED)
+        payload = {'status': self.isUpdating}
+        eventManager().fire(Events.FIRMWARE_UPDATED, payload)
 
     def get_template_configs(self):
         return [
