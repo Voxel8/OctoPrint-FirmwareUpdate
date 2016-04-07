@@ -14,8 +14,7 @@ from glob import glob
 from serial import Serial, SerialException
 from octoprint.events import eventManager, Events
 
-Events.FIRMWARE_UPDATING = "FirmwareUpdating"
-Events.FIRMWARE_UPDATED = "FirmwareUpdated"
+Events.FIRMWARE_UPDATE = "FirmwareUpdate"
 
 __author__ = "Kevin Murphy <kevin@voxel8.co>"
 __license__ = "GNU Affero General Public License http://www.gnu.org/licenses/agpl.html"
@@ -59,26 +58,23 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             self._logger.info("Uknown command.")
 
     def on_api_get(self, request):
-        return flask.jsonify(status=self.isUpdating)
+        return flask.jsonify(isUpdating=self.isUpdating)
 
     def checkStatus(self):
         while True:
             update_result = open(os.path.join(os.path.expanduser('~'), 'Marlin/.build_log')).read()
             if 'No device matching following was found' in update_result:
                 self._logger.info("Failed update...")
-                self.isUpdating = False
-                self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="A connected device was not found."))
+                self._update_status(False, "error", "A connected device was not found.")
                 self._clean_up()
                 break
             elif 'FAILED' in update_result:
                 self._logger.info("Failed update...")
-                self.isUpdating = False
-                self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed"))
+                self._update_status(False, "error")
                 self._clean_up()
                 break
             elif 'bytes of flash verified' in update_result and 'avrdude done' in update_result:
                 self._logger.info("Successful update!")
-                self.isUpdating = False
                 for line in update_result.splitlines():
                     if "Reading" in line:
                         self.read_time = self.find_between(line, " ", "s")
@@ -87,13 +83,13 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                         self.write_time = self.find_between(line, " ", "s")
                         self.completion_time += float(self.write_time)
 
-                self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="completed", completion_time=round(self.completion_time, 2)))
+                self._update_status(False, "completed", round(self.completion_time, 2))
                 self._clean_up()
                 break
             elif 'ReceiveMessage(): timeout' in update_result:
                 self._logger.info("Update timed out. Check if port is already in use!")
-                self.isUpdating = False
-                self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Device timed out. Please check that the port is not in use!"))
+                self._update_status(False, "error", "Device timed out. Please check that the port is not in use!")
+
                 p = psutil.Process(self.updatePID)
                 for child in p.children(recursive=True):
                     child.kill()
@@ -114,19 +110,15 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             file_exists = False
 
         if file_exists:
-            self.isUpdating = True
-            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, createPopup="yes"))
-            payload = {'status': self.isUpdating}
-            eventManager().fire(Events.FIRMWARE_UPDATING, payload)
             self._logger.info("Updating using " + filenames[0])
+            self._update_status(True, "inprogress")
+
             self.firmware_file = os.path.join(os.path.expanduser('~'), 'Marlin/.build/mega2560/' + filenames[0])
             self._update_firmware("local")
         else:
             self._logger.info("No files exist, grabbing latest from GitHub")
-            self.isUpdating = True
-            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, createPopup="yes"))
-            payload = {'status': self.isUpdating}
-            eventManager().fire(Events.FIRMWARE_UPDATING, payload)
+            self._update_status(True, "inprogress")
+
             r = requests.get('https://api.github.com/repos/Voxel8/Marlin/releases/latest')
             rjson = r.json()
             self.firmware_directory = os.path.join(os.path.expanduser('~'), 'Marlin/.build/mega2560/')
@@ -138,9 +130,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                 self._logger.info("File downloaded, continuing...")
                 self._update_firmware("github")
             else:
-                self.isUpdating = False
-                self._logger.info("Failed update... Release firmware was not downloaded")
-                self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="Release firmware was not downloaded."))
+                self._update_status(False, "error", "Release firmware was not downloaded.")
 
     def _update_firmware(self, target):
         if not self.isUpdating:
@@ -157,8 +147,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         try:
             self.port = glob('/dev/ttyACM*')[0]
         except IndexError:
-            self.isUpdating = False
-            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason="No ports exist."))
+            self._update_status(False, "error", "No ports exist.")
             raise RuntimeError('No ports detected')
 
         try:
@@ -169,8 +158,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         try:
             s = Serial(self.port, 115200)
         except SerialException as e:
-            self.isUpdating = False
-            self._plugin_manager.send_plugin_message(self._identifier, dict(isupdating=self.isUpdating, status="failed", reason=str(e)))
+            self._update_status(False, "error", str(e))
             raise RuntimeError(str(e))
         s.setDTR(False)
         sleep(0.1)
@@ -188,13 +176,17 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         except ValueError:
             return ""
 
+    def _update_status(self, isUpdating, status=None, message=None):
+        self.isUpdating = isUpdating
+        self._plugin_manager.send_plugin_message(self._identifier, dict(isUpdating=self.isUpdating, status=status, message=message))
+        payload = {'isUpdating': self.isUpdating, 'status': status, 'message': message}
+        eventManager().fire(Events.FIRMWARE_UPDATE, payload)
+
     def _clean_up(self):
         if self.f is not None:
             if not self.f.closed:
                 self.f.close()
         os.remove(self.firmware_file)
-        payload = {'status': self.isUpdating}
-        eventManager().fire(Events.FIRMWARE_UPDATED, payload)
 
     def get_template_configs(self):
         return [

@@ -50,14 +50,14 @@ $(function() {
       if (plugin != "firmwareupdate") {
         return;
       }
-      if (data.hasOwnProperty("isupdating")) {
-        self.isUpdating(data.isupdating);
-        if (data.status == "failed") {
-          if (data.reason) {
+      if (data.hasOwnProperty("isUpdating")) {
+        self.isUpdating(data.isUpdating);
+        if (data.status == "error") {
+          if (data.message) {
             $("#printer_connect").prop("disabled", false);
             self._showPopup({
               title: gettext("Update failed!"),
-              text: gettext("Updating your printer firmware was not successful.<br>" + pnotifyAdditionalInfo(data.reason)),
+              text: gettext("Updating your printer firmware was not successful.<br>" + pnotifyAdditionalInfo(data.message)),
               type: "error",
               hide: false,
               buttons: {
@@ -80,14 +80,14 @@ $(function() {
           $("#printer_connect").prop("disabled", false);
           self._showPopup({
             title: gettext("Update complete."),
-            text: gettext("The firmware on your printer has been successfully updated after " + data.completion_time + " seconds."),
+            text: gettext("The firmware on your printer has been successfully updated after " + data.message + " seconds."),
             type: "success",
             hide: false,
             buttons: {
               sticker: false
             }
           });
-        } else if (data.createPopup == "yes") {
+        } else if (data.status == "inprogress") {
           $("#printer_connect").prop("disabled", true);
           self._showPopup({
             title: gettext("Updating..."),
@@ -132,7 +132,7 @@ $(function() {
           console.log('error');
         },
         success: function(data) {
-          if (data.status) {
+          if (data.isUpdating) {
             $("#printer_connect").prop("disabled", true);
             self._showPopup({
               title: gettext("Updating..."),
@@ -144,6 +144,8 @@ $(function() {
                 sticker: false
               }
             });
+          } else {
+            self._closePopup();
           }
         }
       });
