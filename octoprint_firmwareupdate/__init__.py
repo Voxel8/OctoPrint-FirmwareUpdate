@@ -30,6 +30,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     def __init__(self):
         self.isUpdating = False
         self.firmware_file = None
+        self.version_file = None
         self._checkTimer = None
         self.updatePID = None
         self.f = None
@@ -37,6 +38,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         self.write_time = None
         self.read_time = None
         self.port = None
+        self.version = None
 
     def get_assets(self):
         return {
@@ -50,15 +52,21 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
     def on_api_command(self, command, data):
         if command == "update_firmware":
-            self._update_firmware_init_thread = Thread(target=self._update_firmware_init)
-            self._update_firmware_init_thread.daemon = True
-            self._update_firmware_init_thread.start()
+            self._start_update()
 
         else:
             self._logger.info("Uknown command.")
 
     def on_api_get(self, request):
         return flask.jsonify(isUpdating=self.isUpdating)
+
+    def on_after_startup(self):
+        self._start_update(True)
+
+    def _start_update(self, onstartup=False):
+        self._update_firmware_init_thread = Thread(target=self._update_firmware_init, args=(onstartup,))
+        self._update_firmware_init_thread.daemon = True
+        self._update_firmware_init_thread.start()
 
     def checkStatus(self):
         while True:
@@ -98,46 +106,82 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                 break
             sleep(1)
 
-    def _update_firmware_init(self):
+    def _update_firmware_init(self, onstartup=False):
         if self.printer_is_printing():
             self._update_status(False, "error", "Printer is in use.")
             raise RuntimeError("Printer is in use - cannot continue")
 
         self.firmware_directory = os.path.join(os.path.expanduser('~'), 'Marlin/.build/mega2560/')
         self.src_directory = os.path.join(os.path.expanduser('~'), 'Marlin/src')
+        self.version_file = os.path.join(os.path.expanduser('~'), 'Marlin/.version')
         if not os.path.exists(self.firmware_directory):
             os.makedirs(self.firmware_directory)
         if not os.path.exists(self.src_directory):
             os.makedirs(self.src_directory)
 
-        filenames = os.listdir(self.firmware_directory)
-        if len(filenames) > 0:
-            if filenames[0].endswith('.hex'):
-                file_exists = True
+        if onstartup:
+            # Delete all files inside firmware_directory
+            filelist = glob(self.firmware_directory + "*.hex")
+            for f in filelist:
+                os.remove(f)
+            # Check against current version
+            if not os.path.isfile(self.version_file):
+                self._logger.info("No version file exists, grabbing latest from GitHub")
+                self._update_status(True, "inprogress")
+
+                self._update_from_github()
+            else:
+                with open(self.version_file, 'r') as f:
+                    self.version = f.readline()
+
+                r = requests.get('https://api.github.com/repos/Voxel8/Marlin/releases/latest')
+                rjson = r.json()
+                github_version = rjson['assets'][0]['updated_at']
+
+                if self.version == github_version:
+                    # Skip Update TODO
+                    self._logger.info("Skipping update process")
+                    self.isUpdating = False
+                else:
+                    self._logger.info("Version in file is different, grabbing from GitHub")
+                    self._update_status(True, "inprogress")
+
+                    self._update_from_github()
+        else:
+            filenames = os.listdir(self.firmware_directory)
+            if len(filenames) > 0:
+                if filenames[0].endswith('.hex'):
+                    file_exists = True
+                else:
+                    file_exists = False
             else:
                 file_exists = False
-        else:
-            file_exists = False
 
-        if file_exists:
-            self._logger.info("Updating using " + filenames[0])
-            self._update_status(True, "inprogress")
+            if file_exists:
+                self._logger.info("Updating using " + filenames[0])
+                self._update_status(True, "inprogress")
 
-            self.firmware_file = os.path.join(os.path.expanduser('~'), 'Marlin/.build/mega2560/' + filenames[0])
-            self._update_firmware("local")
-        else:
-            self._logger.info("No files exist, grabbing latest from GitHub")
-            self._update_status(True, "inprogress")
-
-            r = requests.get('https://api.github.com/repos/Voxel8/Marlin/releases/latest')
-            rjson = r.json()
-            self.firmware_file = os.path.join(self.firmware_directory, 'firmware.hex')
-            urllib.urlretrieve(rjson['assets'][0]['browser_download_url'], self.firmware_file)
-            if os.path.isfile(self.firmware_file):
-                self._logger.info("File downloaded, continuing...")
-                self._update_firmware("github")
+                self.firmware_file = os.path.join(os.path.expanduser('~'), 'Marlin/.build/mega2560/' + filenames[0])
+                self._update_firmware("local")
             else:
-                self._update_status(False, "error", "Release firmware was not downloaded.")
+                self._logger.info("No files exist, grabbing latest from GitHub")
+                self._update_status(True, "inprogress")
+
+                self._update_from_github()
+
+    def _update_from_github(self):
+        r = requests.get('https://api.github.com/repos/Voxel8/Marlin/releases/latest')
+        rjson = r.json()
+        self.firmware_file = os.path.join(self.firmware_directory, 'firmware.hex')
+        # Write version to File
+        with open(self.version_file, 'w') as f:
+            f.write(rjson['assets'][0]['updated_at'])
+        urllib.urlretrieve(rjson['assets'][0]['browser_download_url'], self.firmware_file)
+        if os.path.isfile(self.firmware_file):
+            self._logger.info("File downloaded, continuing...")
+            self._update_firmware("github")
+        else:
+            self._update_status(False, "error", "Release firmware was not downloaded.")
 
     def _update_firmware(self, target):
         if not self.isUpdating:
@@ -188,6 +232,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         # Reconnect again after no longer updating
         if not self.isUpdating:
             self._printer.connect()
+            if status == "error":
+                os.remove(self.version_file)
         else:
             self._printer.disconnect()
 
@@ -205,6 +251,9 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         if self._printer.is_printing() or self._printer.is_paused():
             return True
         return False
+
+    def _get_firmware_date(self):
+        return 1
 
     def get_template_configs(self):
         return [
