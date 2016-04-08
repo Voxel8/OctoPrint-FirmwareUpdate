@@ -204,7 +204,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         try:
             os.remove(os.path.join(os.path.expanduser('~'), 'Marlin/.build_log'))
         except OSError:
-            pass
+            self._logger.info("Couldn't delete build log file")
         self.f = open(os.path.join(os.path.expanduser('~'), 'Marlin/.build_log'), "w")
         try:
             s = Serial(self.port, 115200)
@@ -245,6 +245,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         if self.f is not None:
             if not self.f.closed:
                 self.f.close()
+        try:
+            os.remove(os.remove(os.path.join(os.path.expanduser('~'), 'Marlin/.build_log')))
+        except OSError:
+            pass
         os.remove(self.firmware_file)
 
     def printer_is_printing(self):
