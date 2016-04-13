@@ -233,7 +233,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         if not self.isUpdating:
             self._printer.connect()
             if status == "error":
-                os.remove(self.version_file)
+                try:
+                    os.remove(self.version_file)
+                except OSError:
+                    pass
         else:
             self._printer.disconnect()
 
