@@ -199,8 +199,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         else:
             try:
                 os.remove(os.path.expanduser('~/Marlin/.build_log'))
-            except OSError:
-                pass
+            except OSError as e:
+                self._logger.info(e)
 
             self._update_firmware_thread = Thread(target=self._update_worker)
             self._update_firmware_thread.daemon = True
