@@ -197,6 +197,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         if not self.isUpdating:
             self._logger.info("Skipped initiation. Aborting...")
         else:
+            self._logger.info("Updating...............")
             try:
                 os.remove(os.path.expanduser('~/Marlin/.build_log'))
             except OSError as e:
