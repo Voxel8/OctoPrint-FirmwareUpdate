@@ -276,6 +276,3 @@ __plugin_name__ = "Firmware Update Plugin"
 def __plugin_load__():
     global __plugin_implementation__
     __plugin_implementation__ = FirmwareUpdatePlugin()
-
-    global __plugin_hooks__
-    __plugin_hooks__ = {}
