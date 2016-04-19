@@ -83,40 +83,40 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         while True:
             with open(os.path.expanduser('~/Marlin/.build_log')) as f:
                 update_result = f.read()
-                if 'No device matching following was found' in update_result:
-                    self._logger.info("Failed update...")
-                    self._update_status(False, "error", "A connected device was not found.")
-                    self._clean_up()
-                    break
-                elif 'FAILED' in update_result:
-                    self._logger.info("Failed update...")
-                    self._update_status(False, "error")
-                    self._clean_up()
-                    break
-                elif 'bytes of flash verified' in update_result and 'avrdude done' in update_result:
-                    self._logger.info("Successful update!")
-                    for line in update_result.splitlines():
-                        if "Reading" in line:
-                            self.read_time = self.find_between(line, " ", "s")
-                            self.completion_time += float(self.read_time)
-                        elif "Writing" in line:
-                            self.write_time = self.find_between(line, " ", "s")
-                            self.completion_time += float(self.write_time)
+            if 'No device matching following was found' in update_result:
+                self._logger.info("Failed update...")
+                self._update_status(False, "error", "A connected device was not found.")
+                self._clean_up()
+                break
+            elif 'FAILED' in update_result:
+                self._logger.info("Failed update...")
+                self._update_status(False, "error")
+                self._clean_up()
+                break
+            elif 'bytes of flash verified' in update_result and 'avrdude done' in update_result:
+                self._logger.info("Successful update!")
+                for line in update_result.splitlines():
+                    if "Reading" in line:
+                        self.read_time = self.find_between(line, " ", "s")
+                        self.completion_time += float(self.read_time)
+                    elif "Writing" in line:
+                        self.write_time = self.find_between(line, " ", "s")
+                        self.completion_time += float(self.write_time)
 
-                    self._update_status(False, "completed", round(self.completion_time, 2))
-                    self._clean_up()
-                    break
-                elif 'ReceiveMessage(): timeout' in update_result:
-                    self._logger.info("Update timed out. Check if port is already in use!")
-                    self._update_status(False, "error", "Device timed out. Please check that the port is not in use!")
+                self._update_status(False, "completed", round(self.completion_time, 2))
+                self._clean_up()
+                break
+            elif 'ReceiveMessage(): timeout' in update_result:
+                self._logger.info("Update timed out. Check if port is already in use!")
+                self._update_status(False, "error", "Device timed out. Please check that the port is not in use!")
 
-                    p = psutil.Process(self.updatePID)
-                    for child in p.children(recursive=True):
-                        child.kill()
-                        p.kill()
-                    self._clean_up()
-                    break
-                sleep(1)
+                p = psutil.Process(self.updatePID)
+                for child in p.children(recursive=True):
+                    child.kill()
+                    p.kill()
+                self._clean_up()
+                break
+            sleep(1)
 
     def _update_firmware_init(self, onstartup=False):
         if self.printer_is_printing():
