@@ -1,3 +1,3 @@
 <div class="row-fluid">
-	<button class="btn span12" id="update_firmware" data-bind="click: update_firmware, enable: !printerState.isOperational() && loginState.isUser() && enableUpdating"><span>{{ _('Update Printer Firmware') }}</span></button>
+	<button class="btn span12" id="update_firmware" data-bind="click: update_firmware, enable: loginState.isAdmin() && enableUpdating"><span>{{ _('Update Printer Firmware') }}</span></button>
 </div>

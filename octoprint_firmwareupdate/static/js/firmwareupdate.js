@@ -4,13 +4,20 @@ $(function() {
 
     self.printerState = parameters[0];
     self.loginState = parameters[1];
-    self.connectionState = parameters[2];
+    self.connection = parameters[2];
     self.settings = parameters[3];
     self.popup = undefined;
     self.isUpdating = ko.observable(undefined);
+    self.connection.isUpdating = self.isUpdating;
     self.enableUpdating = ko.computed(function() {
       return self.isUpdating() == false ? true : false;
     });
+
+    self.connection.onBeforeBinding = function () {
+        $("#printer_connect").attr("data-bind", function() {
+          return $(this).attr("data-bind").replace(/enable: loginState.isUser()/g, "enable: loginState.isUser() && !isUpdating");
+        });
+      };
 
     self._showPopup = function(options, eventListeners) {
       self._closePopup();
@@ -39,25 +46,24 @@ $(function() {
     };
 
     self.onDataUpdaterReconnect = function() {
-      checkUpdating();
+      self.checkUpdating();
     }
 
-    self.onUserLoggedIn = function(user) {
-      checkUpdating();
+    self.onStartupComplete = function() {
+      self.checkUpdating();
     }
 
     self.onDataUpdaterPluginMessage = function(plugin, data) {
       if (plugin != "firmwareupdate") {
         return;
       }
-      if (data.hasOwnProperty("isupdating")) {
-        self.isUpdating(data.isupdating);
-        if (data.status == "failed") {
-          if (data.reason) {
-            $("#printer_connect").prop("disabled", false);
+      if (data.hasOwnProperty("isUpdating")) {
+        self.isUpdating(data.isUpdating);
+        if (data.status == "error") {
+          if (data.message) {
             self._showPopup({
               title: gettext("Update failed!"),
-              text: gettext("Updating your printer firmware was not successful.<br>" + pnotifyAdditionalInfo(data.reason)),
+              text: gettext("Updating your printer firmware was not successful.<br>" + pnotifyAdditionalInfo(data.message)),
               type: "error",
               hide: false,
               buttons: {
@@ -65,7 +71,6 @@ $(function() {
               }
             });
           } else {
-            $("#printer_connect").prop("disabled", false);
             self._showPopup({
               title: gettext("Update failed!"),
               text: gettext("Updating your printer firmware was not successful."),
@@ -77,18 +82,16 @@ $(function() {
             });
           }
         } else if (data.status == "completed") {
-          $("#printer_connect").prop("disabled", false);
           self._showPopup({
             title: gettext("Update complete."),
-            text: gettext("The firmware on your printer has been successfully updated!"),
+            text: gettext("The firmware on your printer has been successfully updated after " + data.message + " seconds."),
             type: "success",
             hide: false,
             buttons: {
               sticker: false
             }
           });
-        } else if (data.createPopup == "yes") {
-          $("#printer_connect").prop("disabled", true);
+        } else if (data.status == "inprogress") {
           self._showPopup({
             title: gettext("Updating..."),
             text: gettext("Now updating, please wait."),
@@ -110,7 +113,6 @@ $(function() {
     }
 
     self.update_firmware = function() {
-      $("#printer_connect").prop("disabled", true);
       $.ajax({
         type: "POST",
         url: "/api/plugin/firmwareupdate",
@@ -118,31 +120,38 @@ $(function() {
           command: 'update_firmware'
         }),
         contentType: "application/json; charset=utf-8",
+        dataType: "json"
+      });
+    };
+
+    self.checkUpdating = function() {
+      $.ajax({
+        type: "GET",
+        url: "/api/plugin/firmwareupdate",
+        contentType: "application/json; charset=utf-8",
         dataType: "json",
-        complete: function(data) {
-          console.log(data);
-        },
         error: function(jqXHR, exception) {
-          console.log(jqXHR);
+          console.log('error');
+        },
+        success: function(data) {
+          self.isUpdating(data.isUpdating);
+          if (data.isUpdating) {
+            self._showPopup({
+              title: gettext("Updating..."),
+              text: gettext("Now updating, please wait."),
+              icon: "icon-cog icon-spin",
+              hide: false,
+              buttons: {
+                closer: false,
+                sticker: false
+              }
+            });
+          } else {
+            self._closePopup();
+          }
         }
       });
     };
-  }
-
-  function checkUpdating() {
-    console.log("Checking update status");
-    $.ajax({
-      type: "POST",
-      url: "/api/plugin/firmwareupdate",
-      data: JSON.stringify({
-        command: 'check_is_updating'
-      }),
-      contentType: "application/json; charset=utf-8",
-      dataType: "json",
-      error: function(jqXHR, exception) {
-        console.log(jqXHR);
-      }
-    });
   }
 
   ADDITIONAL_VIEWMODELS.push([
