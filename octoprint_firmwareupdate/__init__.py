@@ -170,9 +170,17 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                     with open(self.version_file, 'r') as f:
                         self.version = f.readline()
 
-                    r = requests.get(
-                        ("https://api.github.com/repos/Voxel8/"
-                         "Marlin/releases/latest"))
+                    try:
+                        r = requests.get(
+                            ("https://api.github.com/repos/Voxel8/"
+                             "Marlin/releases/latest"))
+                    except (requests.exceptions.ConnectionError,
+                            requests.exceptions.HTTPError) as e:
+                        self._logger.info(e)
+                        self._update_status(
+                            False, "error", "Connection error encountered")
+                        return
+
                     rjson = r.json()
                     github_version = rjson['assets'][0]['updated_at']
 
@@ -213,8 +221,16 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             return None
 
     def _update_from_github(self):
-        r = requests.get(
-            'https://api.github.com/repos/Voxel8/Marlin/releases/latest')
+        try:
+            r = requests.get(
+                'https://api.github.com/repos/Voxel8/Marlin/releases/latest')
+        except (requests.exceptions.ConnectionError,
+                requests.exceptions.HTTPError) as e:
+            self._logger.info(e)
+            self._update_status(
+                False, "error", "Connection error encountered")
+            return
+
         rjson = r.json()
         self.firmware_file = os.path.join(
             self.firmware_directory, 'firmware.hex')
