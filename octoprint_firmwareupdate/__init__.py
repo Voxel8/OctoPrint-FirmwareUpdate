@@ -118,8 +118,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                 self._logger.info(
                     "Update timed out. Check if port is already in use!")
                 self._update_status(
-                    False, "error", ("Device timed out. Please check that the "
-                                     "port is not in use!"))
+                    False, "error", "Device timed out. Please check that the "
+                                    "port is not in use!")
 
                 p = psutil.Process(self.updatePID)
                 for child in p.children(recursive=True):
@@ -134,9 +134,9 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                 if self.process.poll() is not None:
                     self._logger.info("Failed update. Consult the build log")
                     self._update_status(
-                        False, "error", ("An unknown error occurred. Please "
-                                         "consult the build log for more "
-                                         "information."))
+                        False, "error", "An unknown error occurred. Please "
+                                        "consult the build log for more "
+                                        "information.")
                     self._clean_up()
                     break
             sleep(1)
@@ -172,8 +172,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
                     try:
                         r = requests.get(
-                            ("https://api.github.com/repos/Voxel8/"
-                             "Marlin/releases/latest"))
+                            "https://api.github.com/repos/Voxel8/"
+                            "Marlin/releases/latest")
                     except (requests.exceptions.ConnectionError,
                             requests.exceptions.HTTPError) as e:
                         self._logger.info(e)
@@ -189,8 +189,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                         self.isUpdating = False
                     else:
                         self._logger.info(
-                            ("Version in file is different, grabbing from "
-                             "GitHub"))
+                            "Version in file is different, grabbing from "
+                            "GitHub")
                         self._update_status(True, "inprogress")
 
                         self._update_from_github()
@@ -283,9 +283,9 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         sleep(0.1)
         s.setDTR(True)
         s.close()
-        self.process = Popen(("cd ~/Marlin/; avrdude -p m2560 -P /dev/ttyACM0 "
-                              "-c stk500v2 -b 250000 -D "
-                              "-U flash:w:./.build/mega2560/firmware.hex:i"),
+        self.process = Popen("cd ~/Marlin/; avrdude -p m2560 -P /dev/ttyACM0 "
+                             "-c stk500v2 -b 250000 -D "
+                             "-U flash:w:./.build/mega2560/firmware.hex:i",
                              stdout=self.build_log,
                              stderr=self.build_log,
                              shell=True,
