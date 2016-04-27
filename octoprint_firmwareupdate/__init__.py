@@ -19,7 +19,7 @@ Events.FIRMWARE_UPDATE = "FirmwareUpdate"
 __author__ = "Kevin Murphy <kevin@voxel8.co>"
 __license__ = ("GNU Affero General Public License "
                "http://www.gnu.org/licenses/agpl.html")
-__copyright__ = ("Copyright (C) 2015 Kevin Murphy - "
+__copyright__ = ("Copyright (C) 2016 Voxel8 - "
                  "Released under terms of the AGPLv3 License")
 
 
