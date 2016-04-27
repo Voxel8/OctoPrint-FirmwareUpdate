@@ -19,7 +19,7 @@ Events.FIRMWARE_UPDATE = "FirmwareUpdate"
 __author__ = "Kevin Murphy <kevin@voxel8.co>"
 __license__ = ("GNU Affero General Public License "
                "http://www.gnu.org/licenses/agpl.html")
-__copyright__ = ("Copyright (C) 2016 Voxel8 - "
+__copyright__ = ("Copyright (C) 2016 Voxel8, Inc. - "
                  "Released under terms of the AGPLv3 License")
 
 
@@ -158,7 +158,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                 # Delete all files inside firmware_directory
                 filelist = glob(os.path.join(self.firmware_directory, "*.hex"))
                 for f in filelist:
-                    os.remove(f)
+                    try:
+                        os.remove(f)
+                    except OSError:
+                        self._logger.info("Firmware file could not be deleted")
                 # Check against current version
                 if not os.path.isfile(self.version_file):
                     self._logger.info(
@@ -211,12 +214,9 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                     self._update_from_github()
 
     def _check_for_firmware_file(self):
-        filenames = os.listdir(self.firmware_directory)
+        filenames = glob(os.path.join(self.firmware_directory, "*.hex"))
         if len(filenames) > 0:
-            if filenames[0].endswith('.hex'):
-                return filenames[0]
-            else:
-                return None
+            return filenames[0]
         else:
             return None
 
@@ -322,7 +322,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         if self.build_log is not None:
             if not self.build_log.closed:
                 self.build_log.close()
-        os.remove(self.firmware_file)
+        try:
+            os.remove(self.firmware_file)
+        except OSError:
+            self._logger.info("Firmware file could not be deleted")
 
     def printer_is_printing(self):
         if self._printer.is_printing() or self._printer.is_paused():
