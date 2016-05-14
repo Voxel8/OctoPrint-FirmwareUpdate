@@ -32,7 +32,8 @@
 }
 
 #settings_plugin_firmwareupdate .advanced-container {
-  margin: 10px 0;
+  margin-top: -10px;
+  margin-bottom: 10px;
 }
 
 #settings_plugin_firmwareupdate a.muted {

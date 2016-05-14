@@ -1,6 +1,14 @@
 <div class="row-fluid">
     <button class="btn span12" id="update_firmware" data-bind="click: update_firmware, enable: loginState.isAdmin() && enableUpdating && !fileData().dataURL()"><span>{{ _('Update Printer Firmware') }}</span></button>
 </div>
+<form class="form-horizontal">
+    <div class="control-group" data-toggle="tooltip">
+        <label class="control-label">{{ _('Enable Firmware Update on Startup') }}</label>
+        <div class="controls">
+            <input type="checkbox" data-bind="checked: settings.auto_update" />
+        </div>
+    </div>
+</form>
 <div class="advanced-container">
     <a class="muted" data-toggle="collapse" href="#collapseFirmware" aria-expanded="false" aria-controls="collapseFirmware" onclick="$(this).children().toggleClass('icon-caret-right icon-caret-down')">
         <i class="icon-caret-right"></i> Advanced
@@ -20,12 +28,4 @@
     <div class="row-fluid" data-bind="if: fileData().dataURL">
         <button class="btn span12" id="update_firmware_from_file" data-bind="click: serverDownload, enable: loginState.isAdmin() && enableUpdating"><span>{{ _('Update Printer Firmware Using Upload') }}</span></button>
     </div>
-    <form class="form-horizontal">
-        <div class="control-group" data-toggle="tooltip">
-            <label class="control-label">{{ _('Enable Firmware Update on Startup') }}</label>
-            <div class="controls">
-                <input type="checkbox" data-bind="checked: settings.auto_update" />
-            </div>
-        </div>
-    </form>
 </div>
