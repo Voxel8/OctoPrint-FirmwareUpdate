@@ -1,3 +1,55 @@
 #settings_plugin_firmwareupdate .control-label {
   width: auto;
 }
+
+.no-left-radius {
+  border-bottom-left-radius: 0!important;
+  border-top-left-radius: 0!important;
+}
+
+.right-radius {
+  border-top-right-radius: 2px!important;
+  border-bottom-right-radius: 2px!important;
+}
+
+.n-b-l {
+  border-left-width: 0px!important;
+}
+
+.custom-file-input-file-name {
+  border-right-width: 0px!important;
+}
+
+#settings_plugin_firmwareupdate .settings-parent.disabled {
+  opacity: 0.4!important;
+}
+
+#settings_plugin_firmwareupdate .settings-parent.disabled .btn:hover {
+  background-image: none!important;
+}
+
+#settings_plugin_firmwareupdate .settings-parent.disabled * {
+  cursor: not-allowed!important;
+}
+
+#settings_plugin_firmwareupdate .input-group {
+  margin-bottom: 0px!important;
+}
+
+#settings_plugin_firmwareupdate .advanced-container {
+  margin-top: -10px;
+  margin-bottom: 10px;
+}
+
+#settings_plugin_firmwareupdate a.muted {
+  text-decoration: none!important;
+}
+
+#settings_plugin_firmwareupdate .btn.disabled:hover,
+#settings_plugin_firmwareupdate .btn[disabled]:hover {
+  background-image: none!important;
+}
+
+.display-none {
+  display: none!important;
+}

@@ -1,9 +1,8 @@
 # coding=utf-8
 from __future__ import absolute_import
 
-import octoprint.plugin
-import flask
 import os
+import base64
 from subprocess import Popen
 import psutil
 from time import sleep
@@ -11,8 +10,12 @@ import requests
 from threading import Thread
 from glob import glob
 from serial import Serial, SerialException
-from octoprint.events import eventManager, Events
+import flask
+import octoprint.plugin
 import shutil
+from octoprint.events import eventManager, Events
+from octoprint.server.util.flask import restricted_access
+from octoprint.server import admin_permission, VERSION
 
 Events.FIRMWARE_UPDATE = "FirmwareUpdate"
 
@@ -27,7 +30,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                            octoprint.plugin.TemplatePlugin,
                            octoprint.plugin.AssetPlugin,
                            octoprint.plugin.SettingsPlugin,
-                           octoprint.plugin.SimpleApiPlugin):
+                           octoprint.plugin.SimpleApiPlugin,
+                           octoprint.plugin.BlueprintPlugin):
 
     def __init__(self):
         # State to keep track if an update is in progress
@@ -68,8 +72,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
     def get_assets(self):
         return {
-            "js": ["js/firmwareupdate.js"],
-            "css": ["css/style.css"]
+            "js": ["js/firmwareupdate.js",
+                   "js/knockout-file-bindings.js"],
+            "css": ["css/style.css",
+                    "css/knockout-file-bindings.css"]
         }
 
     def get_api_commands(self):
@@ -100,6 +106,33 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             self._start_update(True)
         else:
             self._logger.info("Auto firmware update disabled, skipping...")
+
+    @octoprint.plugin.BlueprintPlugin.route("/upload", methods=["POST"])
+    @restricted_access
+    @admin_permission.require(403)
+    def upload_file(self):
+        # Delete any firmware files that may exist when using custom firmware
+        self._delete_firmware_files()
+        if "base64String" not in flask.request.values:
+            return flask.make_response("Expected a base64String value", 400)
+
+        try:
+            decode = base64.b64decode(flask.request.values['base64String'])
+            self._check_directories()
+            with open(os.path.join(self.firmware_directory,
+                                   "firmware.hex"), "wb") as firmware:
+                firmware.write(decode)
+                firmware.close()
+                self._start_update()
+                return flask.make_response("OK", 200)
+        except (TypeError, IOError):
+            error_text = "There was an issue saving the firmware file."
+            self._logger.warn(error_text)
+            self._update_status(
+                False, "error", error_text)
+            return flask.make_response(error_text, 400)
+
+        return flask.make_response("OK", 200)
 
     def _start_update(self, onstartup=False):
         # Make sure printer is disconnected before continuing
@@ -174,7 +207,6 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             self._check_directories()
 
             if onstartup:
-                # Delete all files inside firmware_directory
                 self._delete_firmware_files()
 
                 # Check against current version
@@ -378,6 +410,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         if not os.path.exists(self.src_directory):
             os.makedirs(self.src_directory)
 
+    # Delete all files inside firmware_directory
     def _delete_firmware_files(self):
         self._logger.info("Wiping firmware directory...")
         filelist = glob(os.path.join(self.firmware_directory, "*.hex"))
@@ -411,9 +444,20 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                  data_bind="visible: loginState.isAdmin()"),
         ]
 
+    def increase_upload_bodysize(self, current_max_body_sizes, *args,
+                                 **kwargs):
+        # set a maximum body size of 1 MB for plugin archive uploads
+        return [("POST", r"/upload", 100 * 1024 * 1024)]
+
 __plugin_name__ = "Firmware Update Plugin"
 
 
 def __plugin_load__():
     global __plugin_implementation__
     __plugin_implementation__ = FirmwareUpdatePlugin()
+
+    global __plugin_hooks__
+    __plugin_hooks__ = {
+        "octoprint.server.http.bodysize":
+            __plugin_implementation__.increase_upload_bodysize
+    }

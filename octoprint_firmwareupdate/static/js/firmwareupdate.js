@@ -9,9 +9,27 @@ $(function() {
     self.popup = undefined;
     self.isUpdating = ko.observable(undefined);
     self.connection.isUpdating = self.isUpdating;
+    self.fileData = ko.observable({
+      base64String: ko.observable()
+    });
     self.enableUpdating = ko.computed(function() {
       return self.isUpdating() == false ? true : false;
     });
+    self.enableUploading = ko.computed(function() {
+      if (self.fileData().base64String() == null) {
+        return false;
+      } else {
+        return self.enableUpdating();
+      }
+    });
+
+    self.onClear = function(fileData) {
+      fileData.clear && fileData.clear();
+    };
+
+    self.serverUpload = function() {
+      $.post("/plugin/firmwareupdate/upload", { base64String: self.fileData().base64String() });
+    };
 
     self.connection.onBeforeBinding = function () {
       $("#printer_connect").attr("data-bind", function() {
