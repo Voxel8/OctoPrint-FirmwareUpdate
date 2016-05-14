@@ -1,7 +1,7 @@
 <div class="row-fluid">
-  <button class="btn span12" id="update_firmware" data-bind="click: update_firmware, enable: loginState.isAdmin() && enableUpdating"><span>{{ _('Update Printer Firmware') }}</span></button>
+    <button class="btn span12" id="update_firmware" data-bind="click: update_firmware, enable: loginState.isAdmin() && enableUpdating()"><span>{{ _('Update Printer Firmware') }}</span></button>
 </div>
-<form class="form-horizontal" id="tab_plugin_snapstream">
+<form class="form-horizontal">
     <div class="control-group" data-toggle="tooltip">
         <label class="control-label">{{ _('Enable Firmware Update on Startup') }}</label>
         <div class="controls">
@@ -9,3 +9,27 @@
         </div>
     </div>
 </form>
+<div class="advanced-container">
+    <a class="muted" data-toggle="collapse" href="#collapseFirmware" aria-expanded="false" aria-controls="collapseFirmware" onclick="$(this).children().toggleClass('icon-caret-right icon-caret-down')">
+        <i class="icon-caret-right"></i> Advanced
+    </a>
+</div>
+<div class="collapse" id="collapseFirmware">
+    <div class="settings-parent" data-bind="css: { disabled: !enableUpdating() }">
+        <div class="row-fluid">
+            <div class="span8">
+                <input type="file" data-bind="fileInput: fileData, customFileInput: {
+                  buttonText: 'Browse...',
+                  changeButtonText: 'Browse...',
+                  buttonClass: 'btn btn-primary no-left-radius right-radius',
+                  clearButtonClass: 'display-none',
+                  fileNameClass: 'disabled form-control',
+                  onClear: onClear,
+                }, enable: loginState.isAdmin() && enableUpdating()" accept=".hex">
+            </div>
+            <div class="span4">
+                <button class="btn span12" id="update_firmware_from_file" data-bind="css: {disabled: !enableUploading()}, click: serverUpload, enable: loginState.isAdmin() && enableUploading()"><span>{{ _('Upload') }}</span></button>
+            </div>
+        </div>
+    </div>
+</div>
