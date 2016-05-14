@@ -13,6 +13,7 @@ from threading import Thread
 from glob import glob
 from serial import Serial, SerialException
 from octoprint.events import eventManager, Events
+import base64
 
 Events.FIRMWARE_UPDATE = "FirmwareUpdate"
 
@@ -27,7 +28,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                            octoprint.plugin.TemplatePlugin,
                            octoprint.plugin.AssetPlugin,
                            octoprint.plugin.SettingsPlugin,
-                           octoprint.plugin.SimpleApiPlugin):
+                           octoprint.plugin.SimpleApiPlugin,
+                           octoprint.plugin.BlueprintPlugin):
 
     def __init__(self):
         # State to keep track if an update is in progress
@@ -35,7 +37,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         # Location of the hex file
         self.firmware_file = None
         # Location of the version file
-        self.version_file = None
+        self.version_file = os.path.expanduser('~/Marlin/.version')
         # PID of the update process (avrdude) so we can kill if timeout
         self.updatePID = None
         # Update build log
@@ -51,6 +53,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         self.version = None
         # Update process Popen object
         self.process = None
+        # Directories where firmware lives
+        self.firmware_directory = os.path.expanduser(
+            '~/Marlin/.build/mega2560/')
+        self.src_directory = os.path.expanduser('~/Marlin/src')
 
     def get_settings_defaults(self):
         return dict(
@@ -59,8 +65,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
     def get_assets(self):
         return {
-            "js": ["js/firmwareupdate.js"],
-            "css": ["css/style.css"]
+            "js": ["js/firmwareupdate.js",
+                   "js/knockout-file-bindings.js"],
+            "css": ["css/style.css",
+                    "css/knockout-file-bindings.css"]
         }
 
     def get_api_commands(self):
@@ -91,6 +99,29 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             self._start_update(True)
         else:
             self._logger.info("Auto firmware update disabled, skipping...")
+
+    @octoprint.plugin.BlueprintPlugin.route("/upload", methods=["POST"])
+    def upload_file(self):
+        if "dataURL" not in flask.request.values:
+            return flask.make_response("Expected a dataURL value", 400)
+
+        try:
+            decode = base64.b64decode(flask.request.values['dataURL']).strip()
+            self._check_directories()
+            with open(os.path.join(self.firmware_directory,
+                                   "firmware.hex"), "wb") as firmware:
+                firmware.write(decode)
+                firmware.close()
+                self._start_update()
+                return flask.make_response("OK", 200)
+        except (TypeError, IOError):
+            error_text = "There was an issue saving the firmware file."
+            self._logger.warn(error_text)
+            self._update_status(
+                False, "error", error_text)
+            return flask.make_response(error_text, 400)
+
+        return flask.make_response("OK", 200)
 
     def _start_update(self, onstartup=False):
         # Make sure printer is disconnected before continuing
@@ -162,14 +193,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         if self.printer_is_printing():
             self._update_status(False, "error", "Printer is in use.")
         else:
-            self.firmware_directory = os.path.expanduser(
-                '~/Marlin/.build/mega2560/')
-            self.src_directory = os.path.expanduser('~/Marlin/src')
-            self.version_file = os.path.expanduser('~/Marlin/.version')
-            if not os.path.exists(self.firmware_directory):
-                os.makedirs(self.firmware_directory)
-            if not os.path.exists(self.src_directory):
-                os.makedirs(self.src_directory)
+            self._check_directories()
 
             if onstartup:
                 # Delete all files inside firmware_directory
@@ -344,6 +368,12 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         except OSError:
             self._logger.info("Firmware file could not be deleted")
 
+    def _check_directories(self):
+        if not os.path.exists(self.firmware_directory):
+            os.makedirs(self.firmware_directory)
+        if not os.path.exists(self.src_directory):
+            os.makedirs(self.src_directory)
+
     def printer_is_printing(self):
         if self._printer.is_printing() or self._printer.is_paused():
             return True
@@ -355,9 +385,19 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                  data_bind="visible: loginState.isAdmin()"),
         ]
 
+    def increase_upload_bodysize(self, current_max_body_sizes, *args,
+                                 **kwargs):
+        # set a maximum body size of 1 MB for plugin archive uploads
+        return [("POST", r"/upload", 100 * 1024 * 1024)]
+
 __plugin_name__ = "Firmware Update Plugin"
 
 
 def __plugin_load__():
     global __plugin_implementation__
     __plugin_implementation__ = FirmwareUpdatePlugin()
+
+    global __plugin_hooks__
+    __plugin_hooks__ = {
+        "octoprint.server.http.bodysize": __plugin_implementation__.increase_upload_bodysize
+    }

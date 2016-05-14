@@ -12,6 +12,18 @@ $(function() {
     self.enableUpdating = ko.computed(function() {
       return self.isUpdating() == false ? true : false;
     });
+    self.fileData = ko.observable({
+      dataURL: ko.observable(),
+      file: ko.observable()
+    });
+
+    self.onClear = function(fileData) {
+      fileData.clear && fileData.clear();
+    };
+
+    self.serverDownload = function() {
+      $.post("/plugin/firmwareupdate/upload", { dataURL: self.fileData().dataURL() });
+    };
 
     self.connection.onBeforeBinding = function () {
       $("#printer_connect").attr("data-bind", function() {
