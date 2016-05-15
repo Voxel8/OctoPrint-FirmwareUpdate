@@ -58,6 +58,9 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             '~/Marlin/.build/mega2560/')
         self.src_directory = os.path.expanduser('~/Marlin/src')
 
+    def _isUpdating(self):
+        return self.isUpdating
+
     def get_settings_defaults(self):
         return dict(
             auto_update=True
