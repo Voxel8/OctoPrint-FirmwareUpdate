@@ -34,6 +34,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         self.isUpdating = False
         # Location of the hex file
         self.firmware_file = None
+        # Name of a local file if detected
+        self.local_file_name = None
         # Location of the version file
         self.version_file = None
         # PID of the update process (avrdude) so we can kill if timeout
@@ -51,6 +53,9 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         self.version = None
         # Update process Popen object
         self.process = None
+
+    def _is_updating(self):
+        return self.isUpdating
 
     def get_settings_defaults(self):
         return dict(
@@ -215,13 +220,13 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
                         self._update_from_github()
             else:
-                local_file = self._check_for_firmware_file()
-                if local_file is not None:
-                    self._logger.info("Updating using " + local_file)
+                self.local_file_name = self._check_for_firmware_file()
+                if self.local_file_name is not None:
+                    self._logger.info("Updating using " + self.local_file_name)
                     self._update_status(True, "inprogress")
 
                     self.firmware_file = os.path.join(os.path.expanduser(
-                        '~/Marlin/.build/mega2560/'), local_file)
+                        '~/Marlin/.build/mega2560/'), self.local_file_name)
                     self._update_firmware("local")
                 else:
                     self._logger.info(
@@ -275,12 +280,18 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             except OSError:
                 self._logger.info("Build log couldn't be deleted")
 
-            self._update_firmware_thread = Thread(target=self._update_worker)
+            self._update_firmware_thread = Thread(target=self._update_worker,
+                                                  args=(target,))
             self._update_firmware_thread.daemon = True
             self._update_firmware_thread.start()
 
-    def _update_worker(self):
-        self._logger.info("Updating now...")
+    def _update_worker(self, target=None):
+        self._logger.info("Updating now using: " + target)
+
+        if target in ["github", None]:
+            filename = "firmware.hex"
+        else:
+            filename = self.local_file_name
 
         try:
             self.port = glob('/dev/ttyACM*')[0]
@@ -302,7 +313,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         s.close()
         self.process = Popen("cd ~/Marlin/; avrdude -p m2560 -P /dev/ttyACM0 "
                              "-c stk500v2 -b 250000 -D "
-                             "-U flash:w:./.build/mega2560/firmware.hex:i",
+                             "-U flash:w:./.build/mega2560/%s:i" % filename,
                              stdout=self.build_log,
                              stderr=self.build_log,
                              shell=True,
