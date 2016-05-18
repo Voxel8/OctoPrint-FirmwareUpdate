@@ -5,7 +5,7 @@ $(function() {
     self.printerState = parameters[0];
     self.loginState = parameters[1];
     self.connection = parameters[2];
-    self.settings = parameters[3];
+    self.global_settings = parameters[3];
     self.popup = undefined;
     self.isUpdating = ko.observable(undefined);
     self.connection.isUpdating = self.isUpdating;
@@ -14,10 +14,14 @@ $(function() {
     });
 
     self.connection.onBeforeBinding = function () {
-        $("#printer_connect").attr("data-bind", function() {
-          return $(this).attr("data-bind").replace(/enable: loginState.isUser()/g, "enable: loginState.isUser() && !isUpdating");
-        });
-      };
+      $("#printer_connect").attr("data-bind", function() {
+        return $(this).attr("data-bind").replace(/enable: loginState.isUser()/g, "enable: loginState.isUser() && !isUpdating");
+      });
+    };
+
+    self.onBeforeBinding = function() {
+      self.settings = self.global_settings.settings.plugins.firmwareupdate;
+    };
 
     self._showPopup = function(options, eventListeners) {
       self._closePopup();

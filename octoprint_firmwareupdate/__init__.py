@@ -52,20 +52,34 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         # Update process Popen object
         self.process = None
 
+    def get_settings_defaults(self):
+        return dict(
+            auto_update=True
+        )
+
     def get_assets(self):
         return {
-            "js": ["js/firmwareupdate.js"]
+            "js": ["js/firmwareupdate.js"],
+            "css": ["css/style.css"]
         }
 
     def get_api_commands(self):
         return dict(
-            update_firmware=[]
+            update_firmware=[],
+            toggle_auto_update=[]
         )
 
     def on_api_command(self, command, data):
         if command == "update_firmware":
             self._start_update()
-
+        elif command == "toggle_auto_update":
+            if data['current']:
+                auto_update = False
+            else:
+                auto_update = True
+            self._settings.set_boolean(["auto_update"], auto_update)
+            self._settings.save()
+            eventManager().fire(Events.SETTINGS_UPDATED)
         else:
             self._logger.info("Unknown command: " + command)
 
@@ -73,7 +87,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         return flask.jsonify(isUpdating=self.isUpdating)
 
     def on_after_startup(self):
-        self._start_update(True)
+        if self._settings.get_boolean(["auto_update"]):
+            self._start_update(True)
+        else:
+            self._logger.info("Auto firmware update disabled, skipping...")
 
     def _start_update(self, onstartup=False):
         # Make sure printer is disconnected before continuing

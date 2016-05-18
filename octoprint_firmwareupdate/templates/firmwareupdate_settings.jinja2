@@ -1,3 +1,11 @@
 <div class="row-fluid">
-	<button class="btn span12" id="update_firmware" data-bind="click: update_firmware, enable: loginState.isAdmin() && enableUpdating"><span>{{ _('Update Printer Firmware') }}</span></button>
+  <button class="btn span12" id="update_firmware" data-bind="click: update_firmware, enable: loginState.isAdmin() && enableUpdating"><span>{{ _('Update Printer Firmware') }}</span></button>
 </div>
+<form class="form-horizontal" id="tab_plugin_snapstream">
+    <div class="control-group" data-toggle="tooltip">
+        <label class="control-label">{{ _('Enable Firmware Update on Startup') }}</label>
+        <div class="controls">
+            <input type="checkbox" data-bind="checked: settings.auto_update" />
+        </div>
+    </div>
+</form>
