@@ -37,7 +37,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         # Name of a local file if detected
         self.local_file_name = None
         # Location of the version file
-        self.version_file = None
+        self.version_file = os.path.expanduser('~/Marlin/.version')
         # PID of the update process (avrdude) so we can kill if timeout
         self.updatePID = None
         # Update build log
@@ -53,6 +53,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         self.version = None
         # Update process Popen object
         self.process = None
+        # Directories where firmware lives
+        self.firmware_directory = os.path.expanduser(
+            '~/Marlin/.build/mega2560/')
+        self.src_directory = os.path.expanduser('~/Marlin/src')
 
     def _is_updating(self):
         return self.isUpdating
@@ -167,23 +171,12 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         if self.printer_is_printing():
             self._update_status(False, "error", "Printer is in use.")
         else:
-            self.firmware_directory = os.path.expanduser(
-                '~/Marlin/.build/mega2560/')
-            self.src_directory = os.path.expanduser('~/Marlin/src')
-            self.version_file = os.path.expanduser('~/Marlin/.version')
-            if not os.path.exists(self.firmware_directory):
-                os.makedirs(self.firmware_directory)
-            if not os.path.exists(self.src_directory):
-                os.makedirs(self.src_directory)
+            self._check_directories()
 
             if onstartup:
                 # Delete all files inside firmware_directory
-                filelist = glob(os.path.join(self.firmware_directory, "*.hex"))
-                for f in filelist:
-                    try:
-                        os.remove(f)
-                    except OSError:
-                        self._logger.info("Firmware file could not be deleted")
+                self._delete_firmware_files()
+
                 # Check against current version
                 if not os.path.isfile(self.version_file):
                     self._logger.info(
@@ -238,7 +231,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     def _check_for_firmware_file(self):
         filenames = glob(os.path.join(self.firmware_directory, "*.hex"))
         if len(filenames) > 0:
-            return filenames[0]
+            return os.path.basename(filenames[0])
         else:
             return None
 
@@ -297,6 +290,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             self.port = glob('/dev/ttyACM*')[0]
         except IndexError:
             self._update_status(False, "error", "No ports exist.")
+            self._clean_up()
             raise RuntimeError('No ports detected')
 
         self.build_log = open(os.path.expanduser('~/Marlin/.build_log'), "w")
@@ -304,6 +298,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             s = Serial(self.port, 115200)
         except SerialException as e:
             self._update_status(False, "error", str(e))
+            self._clean_up()
             raise RuntimeError(str(e))
 
         # Pulse connection to ensure avrdude can make a connection
@@ -354,6 +349,21 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             os.remove(self.firmware_file)
         except OSError:
             self._logger.info("Firmware file could not be deleted")
+
+    def _check_directories(self):
+        if not os.path.exists(self.firmware_directory):
+            os.makedirs(self.firmware_directory)
+        if not os.path.exists(self.src_directory):
+            os.makedirs(self.src_directory)
+
+    def _delete_firmware_files(self):
+        self._logger.info("Wiping firmware directory...")
+        filelist = glob(os.path.join(self.firmware_directory, "*.hex"))
+        for f in filelist:
+            try:
+                os.remove(f)
+            except OSError:
+                self._logger.info("Firmware file could not be deleted")
 
     def printer_is_printing(self):
         if self._printer.is_printing() or self._printer.is_paused():
