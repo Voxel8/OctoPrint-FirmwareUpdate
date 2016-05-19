@@ -220,6 +220,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
                     self.firmware_file = os.path.join(os.path.expanduser(
                         '~/Marlin/.build/mega2560/'), self.local_file_name)
+
+                    # Using something other than GitHub, delete version file
+                    self._delete_version_file()
+
                     self._update_firmware("local")
                 else:
                     self._logger.info(
@@ -330,10 +334,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         if not self.isUpdating:
             self._printer.connect()
             if status == "error":
-                try:
-                    os.remove(self.version_file)
-                except OSError:
-                    pass
+                self._delete_version_file()
 
         self._plugin_manager.send_plugin_message(self._identifier, dict(
             isUpdating=self.isUpdating, status=status, message=message))
@@ -364,6 +365,14 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                 os.remove(f)
             except OSError:
                 self._logger.info("Firmware file could not be deleted")
+
+    def _delete_version_file(self):
+        if os.path.isfile(self.version_file):
+            self._logger.info("Removing version file")
+            try:
+                os.remove(self.version_file)
+            except OSError:
+                self._logger.warn("Error removing version file")
 
     def printer_is_printing(self):
         if self._printer.is_printing() or self._printer.is_paused():
