@@ -286,6 +286,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         if not self.isUpdating:
             self._logger.info("Skipped initiation. Aborting...")
         else:
+            if target is "local":
+                # Using something other than GitHub, delete version file
+                self._delete_version_file()
+
             self.completion_time = 0
             self.write_time = None
             self.read_time = None
