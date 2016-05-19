@@ -123,8 +123,6 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                                    "firmware.hex"), "wb") as firmware:
                 firmware.write(decode)
                 firmware.close()
-                self._start_update()
-                return flask.make_response("OK", 200)
         except (TypeError, IOError):
             error_text = "There was an issue saving the firmware file."
             self._logger.warn(error_text)
@@ -132,6 +130,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                 False, "error", error_text)
             return flask.make_response(error_text, 400)
 
+        self._start_update()
         return flask.make_response("OK", 200)
 
     def _start_update(self, onstartup=False):
@@ -318,10 +317,6 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         if not self.isUpdating:
             self._logger.info("Skipped initiation. Aborting...")
         else:
-            if target is "local":
-                # Using something other than GitHub, delete version file
-                self._delete_version_file()
-
             self.completion_time = 0
             self.write_time = None
             self.read_time = None
@@ -446,7 +441,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
     def increase_upload_bodysize(self, current_max_body_sizes, *args,
                                  **kwargs):
-        # set a maximum body size of 1 MB for plugin archive uploads
+        # set a maximum body size of 100 MB for plugin archive uploads
         return [("POST", r"/upload", 100 * 1024 * 1024)]
 
 __plugin_name__ = "Firmware Update Plugin"
