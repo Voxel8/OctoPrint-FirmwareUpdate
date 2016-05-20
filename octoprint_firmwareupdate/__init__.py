@@ -111,21 +111,23 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     @restricted_access
     @admin_permission.require(403)
     def upload_file(self):
-        # Delete any firmware files that may exist when using custom firmware
-        self._delete_firmware_files()
         if "base64String" not in flask.request.values:
             return flask.make_response("Expected a base64String value", 400)
 
         try:
             decode = base64.b64decode(flask.request.values['base64String'])
             self._check_directories()
+
+            # Delete any firmware files that may exist when using
+            # custom firmware
+            self._delete_firmware_files()
             with open(os.path.join(self.firmware_directory,
                                    "firmware.hex"), "wb") as firmware:
                 firmware.write(decode)
                 firmware.close()
-        except (TypeError, IOError):
+        except (TypeError, IOError) as e:
             error_text = "There was an issue saving the firmware file."
-            self._logger.warn(error_text)
+            self._logger.warn("Error saving firmware file: %s" % str(e))
             self._update_status(
                 False, "error", error_text)
             return flask.make_response(error_text, 400)
