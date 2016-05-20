@@ -28,7 +28,28 @@ $(function() {
     };
 
     self.serverUpload = function() {
-      $.post("/plugin/firmwareupdate/upload", { base64String: self.fileData().base64String() });
+      self._showPopup({
+        title: gettext("Uploading..."),
+        text: gettext("Currently uploading firmware file, please wait."),
+        icon: "icon-cog icon-spin",
+        hide: false,
+        buttons: {
+          closer: false,
+          sticker: false
+        }
+      });
+      $.post("/plugin/firmwareupdate/upload", { base64String: self.fileData().base64String() })
+        .fail(function(data) {
+          self._showPopup({
+            title: gettext("Uploading failed."),
+            text: gettext("Uploading your firmware to the printer failed.<br>" + pnotifyAdditionalInfo(data.responseText)),
+            type: "error",
+            hide: false,
+            buttons: {
+              sticker: false
+            }
+          });
+        });
     };
 
     self.connection.onBeforeBinding = function () {
