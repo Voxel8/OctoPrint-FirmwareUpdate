@@ -61,6 +61,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         self.firmware_directory = os.path.expanduser(
             '~/Marlin/.build/mega2560/')
         self.src_directory = os.path.expanduser('~/Marlin/src')
+        # Variable that defines if the update was started on startup
+        self.updating_on_startup = False
 
     def _is_updating(self):
         return self.isUpdating
@@ -208,6 +210,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             self._check_directories()
 
             if onstartup:
+                self.updating_on_startup = True
                 self._delete_firmware_files()
 
                 # Check against current version
@@ -245,6 +248,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
                         self._update_from_github()
             else:
+                self.updating_on_startup = False
                 self.local_file_name = self._check_for_firmware_file()
                 if self.local_file_name is not None:
                     self._logger.info("Updating using " + self.local_file_name)
@@ -387,9 +391,11 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                 self._delete_version_file()
 
         self._plugin_manager.send_plugin_message(self._identifier, dict(
-            isUpdating=self.isUpdating, status=status, message=message))
+            isUpdating=self.isUpdating, status=status, message=message,
+            onStartup=self.updating_on_startup))
         payload = {'isUpdating': self.isUpdating,
-                   'status': status, 'message': message}
+                   'status': status, 'message': message,
+                   'onStartup': self.updating_on_startup}
         eventManager().fire(Events.FIRMWARE_UPDATE, payload)
 
     def _clean_up(self):
