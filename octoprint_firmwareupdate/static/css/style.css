@@ -50,6 +50,27 @@
   background-image: none!important;
 }
 
-.display-none {
+#settings_plugin_firmwareupdate .display-none {
   display: none!important;
+}
+
+#settings_plugin_firmwareupdate .loading {
+  width:20px;
+  height:20px;
+  border-radius:150px;
+  border: 2px solid #777777;
+  border-top-color: rgba(0,0,0,1);
+  box-sizing:border-box;
+  margin: 0 auto;
+  animation:loading 1.2s linear infinite;
+  -webkit-animation:loading 1.2s linear infinite;
+}
+
+@keyframes loading{
+  0%{transform:rotate(0deg)}
+  100%{transform:rotate(360deg)}
+}
+@-webkit-keyframes loading{
+  0%{-webkit-transform:rotate(0deg)}
+  100%{-webkit-transform:rotate(360deg)}
 }

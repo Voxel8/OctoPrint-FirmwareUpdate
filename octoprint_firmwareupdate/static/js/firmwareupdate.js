@@ -28,16 +28,7 @@ $(function() {
     };
 
     self.serverUpload = function() {
-      self._showPopup({
-        title: gettext("Uploading..."),
-        text: gettext("Currently uploading firmware file, please wait."),
-        icon: "icon-cog icon-spin",
-        hide: false,
-        buttons: {
-          closer: false,
-          sticker: false
-        }
-      });
+      $("#update_firmware_from_file").html("<div class='loading'></div>");
       $.post("/plugin/firmwareupdate/upload", { base64String: self.fileData().base64String() })
         .fail(function(data) {
           self._showPopup({
@@ -49,6 +40,9 @@ $(function() {
               sticker: false
             }
           });
+        })
+        .always(function() {
+          $("#update_firmware_from_file").html("<span>Upload</span>");
         });
     };
 
