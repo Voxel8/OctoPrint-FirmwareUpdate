@@ -64,9 +64,11 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         # Variable that defines if the update was started on startup
         self.updating_on_startup = False
 
+    # Allow other OctoPrint plugins to get firmware updating status
     def _is_updating(self):
         return self.isUpdating
 
+    # Set default plugin settings for OctoPrint
     def get_settings_defaults(self):
         return dict(
             auto_update=True
@@ -109,6 +111,9 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         else:
             self._logger.info("Auto firmware update disabled, skipping...")
 
+    # Creates endpoint located at /plugin/firmwareupdate/upload
+    # Allows for custom firmware upload by accepting a base64-encoded string
+    # Saves file to filesystem and begins the update process
     @octoprint.plugin.BlueprintPlugin.route("/upload", methods=["POST"])
     @restricted_access
     @admin_permission.require(403)
@@ -138,14 +143,21 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         return flask.make_response("OK", 200)
 
     def _start_update(self, onstartup=False):
-        # Make sure printer is disconnected before continuing
-        self._printer.disconnect()
+        # If by any chance the API command was called outside of Octoprint,
+        # we want to make sure we don't cancel a print.
+        if self.printer_is_printing():
+            self._logger.warn("Firmware called but print in progress.")
+        else:
+            # Make sure printer is disconnected before continuing
+            self._printer.disconnect()
 
-        self._update_firmware_init_thread = Thread(
-            target=self._update_firmware_init, args=(onstartup,))
-        self._update_firmware_init_thread.daemon = True
-        self._update_firmware_init_thread.start()
+            self._update_firmware_init_thread = Thread(
+                target=self._update_firmware_init, args=(onstartup,))
+            self._update_firmware_init_thread.daemon = True
+            self._update_firmware_init_thread.start()
 
+    # Loop that is constantly checking the build log for errors or success
+    # messages
     def checkStatus(self):
         while True:
             with open(os.path.expanduser('~/Marlin/.build_log')) as f:
@@ -203,6 +215,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                     break
             sleep(1)
 
+    # Initiation of firmware update which gathers information about current
+    # release version and compares to present installation version
     def _update_firmware_init(self, onstartup=False):
         if self.printer_is_printing():
             self._update_status(False, "error", "Printer is in use.")
@@ -268,6 +282,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
 
                     self._update_from_github()
 
+    # Checks if any firmware files exists; returns the first one in the list
     def _check_for_firmware_file(self):
         filenames = glob(os.path.join(self.firmware_directory, "*.hex"))
         if len(filenames) > 0:
@@ -275,6 +290,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         else:
             return None
 
+    # Begin the update process from GitHub
     def _update_from_github(self):
         try:
             r = requests.get(
@@ -336,6 +352,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             self._update_firmware_thread.daemon = True
             self._update_firmware_thread.start()
 
+    # Worker process that actually controls the firmware process and writes
+    # to the build log
     def _update_worker(self, target=None):
         self._logger.info("Updating now using: " + target)
 
@@ -382,6 +400,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         except ValueError:
             return ""
 
+    # Function to distribute the state of updating to OctoPrint's front-end
+    # and to printer_ui in the form of an OctoPrint event
     def _update_status(self, isUpdating, status=None, message=None):
         self.isUpdating = isUpdating
         # Reconnect again after no longer updating
@@ -398,6 +418,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                    'onStartup': self.updating_on_startup}
         eventManager().fire(Events.FIRMWARE_UPDATE, payload)
 
+    # Remove the build log and firmware file, if there is one
     def _clean_up(self):
         if self.build_log is not None:
             if not self.build_log.closed:
@@ -407,6 +428,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         except OSError:
             self._logger.info("Firmware file could not be deleted")
 
+    # Create firmware directories, if they don't exist
     def _check_directories(self):
         if not os.path.exists(self.firmware_directory):
             os.makedirs(self.firmware_directory)
