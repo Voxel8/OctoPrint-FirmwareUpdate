@@ -8,7 +8,6 @@ from subprocess import Popen
 import psutil
 from time import sleep
 import requests
-import urllib
 from threading import Thread
 from glob import glob
 from serial import Serial, SerialException
