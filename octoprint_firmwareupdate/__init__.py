@@ -191,12 +191,10 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                     try:
                         r = requests.get(
                             "https://api.github.com/repos/Voxel8/"
-                            "Marlin/releases/latest")
+                            "Marlin/releases/latest", timeout=3.05)
                     except (requests.exceptions.ConnectionError,
                             requests.exceptions.HTTPError) as e:
-                        self._logger.info(e)
-                        self._update_status(
-                            False, "error", "Connection error encountered")
+                        self.raise_connection_error(e)
                         return
 
                     rjson = r.json()
@@ -242,12 +240,11 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
     def _update_from_github(self):
         try:
             r = requests.get(
-                'https://api.github.com/repos/Voxel8/Marlin/releases/latest')
+                'https://api.github.com/repos/Voxel8/Marlin/releases/latest',
+                timeout=3.05)
         except (requests.exceptions.ConnectionError,
                 requests.exceptions.HTTPError) as e:
-            self._logger.info(e)
-            self._update_status(
-                False, "error", "Connection error encountered")
+            self.raise_connection_error(e)
             return
 
         rjson = r.json()
@@ -256,8 +253,28 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         # Write version to File
         with open(self.version_file, 'w') as f:
             f.write(rjson['assets'][0]['updated_at'])
-        urllib.urlretrieve(rjson['assets'][0][
-                           'browser_download_url'], self.firmware_file)
+
+        # Download the hex file from GitHub
+        try:
+            r = requests.get(rjson['assets'][0]['browser_download_url'],
+                             stream=True, timeout=3.05)
+            r.raise_for_status()
+        except (requests.exceptions.ConnectionError,
+                requests.exceptions.HTTPError) as e:
+            self.raise_connection_error(e)
+            return
+
+        with open(self.firmware_file, 'wb') as f:
+            try:
+                for chunk in r.iter_content(chunk_size=8192):
+                    if not chunk:
+                        break
+                    f.write(chunk)
+            except:
+                self.raise_connection_error("Could not download release "
+                                            "firmware.")
+                return
+
         if os.path.isfile(self.firmware_file):
             self._logger.info("File downloaded, continuing...")
             self._update_firmware("github")
@@ -373,6 +390,11 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                 os.remove(self.version_file)
             except OSError:
                 self._logger.warn("Error removing version file")
+
+    def raise_connection_error(self, e):
+        self._logger.info(e)
+        self._update_status(
+            False, "error", "Connection error encountered")
 
     def printer_is_printing(self):
         if self._printer.is_printing() or self._printer.is_paused():
