@@ -13,6 +13,7 @@ from threading import Thread
 from glob import glob
 from serial import Serial, SerialException
 from octoprint.events import eventManager, Events
+import shutil
 
 Events.FIRMWARE_UPDATE = "FirmwareUpdate"
 
@@ -265,14 +266,11 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             return
 
         with open(self.firmware_file, 'wb') as f:
+            r.raw.decode_content = True
             try:
-                for chunk in r.iter_content(chunk_size=8192):
-                    if not chunk:
-                        break
-                    f.write(chunk)
-            except:
-                self.raise_connection_error("Could not download release "
-                                            "firmware.")
+                shutil.copyfileobj(r.raw, f)
+            except (shutil.Error, IOError) as e:
+                self.raise_connection_error(e)
                 return
 
         if os.path.isfile(self.firmware_file):
