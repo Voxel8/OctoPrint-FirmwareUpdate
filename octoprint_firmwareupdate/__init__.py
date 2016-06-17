@@ -193,7 +193,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                             "https://api.github.com/repos/Voxel8/"
                             "Marlin/releases/latest", timeout=(3.05, 27))
                     except (requests.exceptions.ConnectionError,
-                            requests.exceptions.HTTPError) as e:
+                            requests.exceptions.HTTPError,
+                            requests.exceptions.Timeout) as e:
                         self.raise_connection_error(e)
                         return
 
@@ -243,7 +244,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                 'https://api.github.com/repos/Voxel8/Marlin/releases/latest',
                 timeout=(3.05, 27))
         except (requests.exceptions.ConnectionError,
-                requests.exceptions.HTTPError) as e:
+                requests.exceptions.HTTPError,
+                requests.exceptions.Timeout) as e:
             self.raise_connection_error(e)
             return
 
@@ -260,7 +262,8 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                              stream=True, timeout=(3.05, 27))
             r.raise_for_status()
         except (requests.exceptions.ConnectionError,
-                requests.exceptions.HTTPError) as e:
+                requests.exceptions.HTTPError,
+                requests.exceptions.Timeout) as e:
             self.raise_connection_error(e)
             return
 
