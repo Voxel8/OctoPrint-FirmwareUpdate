@@ -9,9 +9,42 @@ $(function() {
     self.popup = undefined;
     self.isUpdating = ko.observable(undefined);
     self.connection.isUpdating = self.isUpdating;
+    self.fileData = ko.observable({
+      base64String: ko.observable()
+    });
     self.enableUpdating = ko.computed(function() {
       return self.isUpdating() == false ? true : false;
     });
+    self.enableUploading = ko.computed(function() {
+      if (self.fileData().base64String() == null) {
+        return false;
+      } else {
+        return self.enableUpdating();
+      }
+    });
+
+    self.onClear = function(fileData) {
+      fileData.clear && fileData.clear();
+    };
+
+    self.serverUpload = function() {
+      $("#update_firmware_from_file").html("<div class='loading'></div>");
+      $.post("/plugin/firmwareupdate/upload", { base64String: self.fileData().base64String() })
+        .fail(function(data) {
+          self._showPopup({
+            title: gettext("Uploading failed."),
+            text: gettext("Uploading your firmware to the printer failed.<br>" + pnotifyAdditionalInfo(data.responseText)),
+            type: "error",
+            hide: false,
+            buttons: {
+              sticker: false
+            }
+          });
+        })
+        .always(function() {
+          $("#update_firmware_from_file").html("<span>Upload</span>");
+        });
+    };
 
     self.connection.onBeforeBinding = function () {
       $("#printer_connect").attr("data-bind", function() {
