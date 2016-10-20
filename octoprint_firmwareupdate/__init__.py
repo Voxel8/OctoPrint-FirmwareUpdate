@@ -241,7 +241,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
                     try:
                         r = requests.get(
                             "https://api.github.com/repos/Voxel8/"
-                            "Marlin/releases/latest", timeout=(3.05, 27))
+                            "Marlin/releases/latest", timeout=27)
                     except (requests.exceptions.ConnectionError,
                             requests.exceptions.HTTPError,
                             requests.exceptions.Timeout) as e:
@@ -295,7 +295,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         try:
             r = requests.get(
                 'https://api.github.com/repos/Voxel8/Marlin/releases/latest',
-                timeout=(3.05, 27))
+                timeout=27)
         except (requests.exceptions.ConnectionError,
                 requests.exceptions.HTTPError,
                 requests.exceptions.Timeout) as e:
@@ -312,7 +312,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
         # Download the hex file from GitHub
         try:
             r = requests.get(rjson['assets'][0]['browser_download_url'],
-                             stream=True, timeout=(3.05, 27))
+                             stream=True, timeout=27)
             r.raise_for_status()
         except (requests.exceptions.ConnectionError,
                 requests.exceptions.HTTPError,
