@@ -12,7 +12,6 @@ from glob import glob
 from serial import Serial, SerialException
 import flask
 import octoprint.plugin
-import shutil
 from octoprint.events import eventManager, Events
 from octoprint.server.util.flask import restricted_access
 from octoprint.server import admin_permission, VERSION
@@ -310,6 +309,7 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             f.write(rjson['assets'][0]['updated_at'])
 
         # Download the hex file from GitHub
+        self._logger.info("Getting URL of latex hex file from GitHub")
         try:
             r = requests.get(rjson['assets'][0]['browser_download_url'],
                              stream=True, timeout=27)
@@ -320,13 +320,14 @@ class FirmwareUpdatePlugin(octoprint.plugin.StartupPlugin,
             self.raise_connection_error(e)
             return
 
-        with open(self.firmware_file, 'wb') as f:
-            r.raw.decode_content = True
-            try:
-                shutil.copyfileobj(r.raw, f)
-            except (shutil.Error, IOError) as e:
-                self.raise_connection_error(e)
-                return
+        self._logger.info("Saving downloaded firmware to disk")
+        try:
+            with open(self.firmware_file, 'wb') as f:
+                for block in r.iter_content(1024):
+                    f.write(block)
+        except IOError as e:
+            self.raise_connection_error(e)
+            return
 
         if os.path.isfile(self.firmware_file):
             self._logger.info("File downloaded, continuing...")
